@@ -31,18 +31,18 @@ impl<T> Node<T>
 			})		
 	}
 
-	pub fn new(mut parent : Rc<Self>, data : T) -> Rc<Self>
+	pub fn new(parent : &mut Rc<Self>, data : T) -> Rc<Self>
 	{
 		println!("Strong count {}", Rc::strong_count(&parent));
 		
 		let msg = format!("Strong count {}", Rc::strong_count(&parent));
-		let weakparent = Rc::downgrade(&parent);
-		let parentnode =Rc::get_mut(&mut parent).expect(msg.as_str());
+		//let weakparent = Rc::downgrade(&parent);
+		let parentnode =Rc::get_mut(parent).expect(msg.as_str());
 		
 		let child =Rc::new(
 			Self
 			{
-				parent : weakparent,
+				parent : Weak::new(),
 				children : Vec::new(),
 				data,
 			});
@@ -95,9 +95,9 @@ mod tests
     fn tree_new() 
     {
     	let mut root = Node::new_root(WidgetObj);
-    	let child1 = Node::new(Rc::clone(&root), WidgetObj);
-    	let child2 = Node::new(Rc::clone(&root), WidgetObj);
-    	let child3 = Node::new(Rc::clone(&root), WidgetObj);
+    	let child1 = Node::new(&mut root, WidgetObj);
+    	let child2 = Node::new(&mut root, WidgetObj);
+    	let child3 = Node::new(&mut root, WidgetObj);
  		
  		assert_eq!(root.children().len(), 3);
     }
