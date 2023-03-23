@@ -2,7 +2,6 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 
-
 use core::marker::PhantomData;
 use std::vec::Vec;
 use std::rc::{Rc, Weak};
@@ -31,25 +30,37 @@ impl<T> Node<T>
 			})		
 	}
 
+    // pub unsafe fn get_mut_unchecked(this: &mut Self) -> &mut T {
+    //     // We are careful to *not* create a reference covering the "count" fields, as
+    //     // this would conflict with accesses to the reference counts (e.g. by `Weak`).
+    //     unsafe { &mut (*this.ptr.as_ptr()).value }
+    // }
+
 	pub fn new(parent : &mut Rc<Self>, data : T) -> Rc<Self>
 	{
-		println!("Strong count {}", Rc::strong_count(&parent));
+		println!("Weak count {}", Rc::weak_count(&parent));
 		
 		let msg = format!("Strong count {}", Rc::strong_count(&parent));
-		//let weakparent = Rc::downgrade(&parent);
-		let parentnode =Rc::get_mut(parent).expect(msg.as_str());
-		
-		let child =Rc::new(
+
+		let child = Rc::new(
 			Self
 			{
-				parent : Weak::new(),
+				parent : Rc::downgrade(parent),
 				children : Vec::new(),
 				data,
 			});
 
-		parentnode.add_child(Rc::clone(&child));
+		{			
+			//let parentnode = Rc::get_mut(parent).expect(msg.as_str());		
+			//parentnode.add_child(Rc::clone(&child));			
+			unsafe 
+			{
+				let ptr = Rc::as_ptr(&parent);
+				(*(ptr as *mut Self)).children.push(Rc::clone(&child));// = Rc::downgrade(parent);
+			}
+		}
 
-		Rc::clone(&child)	
+		child
 	}
 
 	fn parent(&self) -> Option<Rc<Self>>
@@ -78,7 +89,12 @@ impl<T> Node<T>
 
 	fn add_child(&mut self, child : Rc<Self>)
 	{
-		self.children.push(child)
+		self.children.push(child);
+	}
+
+	fn update_lastchild_parent(&mut self)
+	{
+		self.parent = Rc::downgrade(self.children.last().unwrap());
 	}
 
 }
