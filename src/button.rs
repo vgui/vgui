@@ -2,101 +2,69 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 
-use core::marker::PhantomData;
 use std::vec::Vec;
-use std::rc::{Rc, Weak};
-use std::cell::{RefCell};
 use std::any::Any;
 
 
-pub struct Node<T>
+pub struct Node<'a, T>
 {
-	parent : Weak<Node<T>>,
-	children : Vec<Rc<Node<T>>>,
-	data : T,
-	//_marker : PhantomData<T>,
+	parent : Option<&'a Node<'a, T>>,
+	children : Vec<Box<Node<'a, T>>>,
+	data : T,	
 }
 
-impl<T> Node<T>
+impl<'a, T> Node<'a, T>
 {
-	pub fn new_root(data : T) -> Rc<Self>
+	pub fn new_root(data : T) -> Box<Self>
 	{
-		Rc::new(
+		Box::new(
 			Self
 			{
-				parent : Weak::new(),
+				parent : None,
 				children : Vec::new(),
 				data,
 			})		
 	}
 
-    // pub unsafe fn get_mut_unchecked(this: &mut Self) -> &mut T {
-    //     // We are careful to *not* create a reference covering the "count" fields, as
-    //     // this would conflict with accesses to the reference counts (e.g. by `Weak`).
-    //     unsafe { &mut (*this.ptr.as_ptr()).value }
-    // }
-
-	pub fn new(parent : &mut Rc<Self>, data : T) -> Rc<Self>
+	pub fn new(p : &'static mut Self, data : T) -> &Box<Self>
 	{
-		println!("Weak count {}", Rc::weak_count(&parent));
-		
-		let msg = format!("Strong count {}", Rc::strong_count(&parent));
-
-		let child = Rc::new(
+		let child = Box::new(
 			Self
 			{
-				parent : Rc::downgrade(parent),
+				parent : Some(&p),
 				children : Vec::new(),
 				data,
 			});
 
-		{			
-			//let parentnode = Rc::get_mut(parent).expect(msg.as_str());		
-			//parentnode.add_child(Rc::clone(&child));			
-			unsafe 
-			{
-				let ptr = Rc::as_ptr(&parent);
-				(*(ptr as *mut Self)).children.push(Rc::clone(&child));// = Rc::downgrade(parent);
-			}
-		}
-
-		child
+		p.children.push(child);
+    p.children.last().unwrap()
 	}
 
-	fn parent(&self) -> Option<Rc<Self>>
+	fn parent(&self) -> Option<&Node<T>>
 	{
-		self.parent.upgrade()
+		self.parent
 	}
 
-	fn set_parent(&mut self, parent : Option<Rc<Self>>)
+	fn set_parent(&'a mut self, parent : Option<&Node<T>>)
 	{
-		self.parent = match parent
-		{
-			Some(parent) => Rc::downgrade(&parent),
-			None => Weak::new()
-		};
+		self.parent = parent
 	}
 
-	fn children(&self) -> &Vec<Rc<Node<T>>>
+	fn children(&'a self) -> &Vec<Box<Node<T>>>
 	{
 		&self.children
 	}
 
-	fn children_mut(&mut self) -> &mut Vec<Rc<Node<T>>>
+	fn children_mut(&mut self) -> &mut Vec<Box<Self>>
 	{
 		&mut self.children
 	}	
 
-	fn add_child(&mut self, child : Rc<Self>)
+	fn add_child(&mut self, mut child : Self)
 	{
-		self.children.push(child);
+    child.parent = Some(self);
+		self.children.push(Box::new(child))
 	}
-
-	fn update_lastchild_parent(&mut self)
-	{
-		self.parent = Rc::downgrade(self.children.last().unwrap());
-	}
-
 }
 
 struct WidgetObj;

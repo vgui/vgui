@@ -2,73 +2,54 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 
-use core::marker::PhantomData;
 use std::vec::Vec;
 use std::rc::{Rc, Weak};
 use std::cell::{RefCell};
 use std::any::Any;
 
 
-pub struct Node<T>
+pub struct TreeNode<T>
 {
-	parent : Weak<Node<T>>,
-	children : Vec<Rc<Node<T>>>,
+	parent : Weak<RefCell<TreeNode<T>>>,
+	children : Vec<Rc<RefCell<TreeNode<T>>>>,
 	data : T,
-	//_marker : PhantomData<T>,
 }
 
-impl<T> Node<T>
+impl<T> TreeNode<T>
 {
-	pub fn new_root(data : T) -> Rc<Self>
+	pub fn new_root(data : T) -> Rc<RefCell<Self>>
 	{
-		Rc::new(
+		Rc::new(RefCell::new(
 			Self
 			{
 				parent : Weak::new(),
 				children : Vec::new(),
 				data,
-			})		
+			}))		
 	}
 
-    // pub unsafe fn get_mut_unchecked(this: &mut Self) -> &mut T {
-    //     // We are careful to *not* create a reference covering the "count" fields, as
-    //     // this would conflict with accesses to the reference counts (e.g. by `Weak`).
-    //     unsafe { &mut (*this.ptr.as_ptr()).value }
-    // }
-
-	pub fn new(parent : &mut Rc<Self>, data : T) -> Rc<Self>
+	pub fn new(parent : &mut Rc<RefCell<Self>>, data : T) -> Rc<RefCell<Self>>
 	{
-		println!("Weak count {}", Rc::weak_count(&parent));
-		
-		let msg = format!("Strong count {}", Rc::strong_count(&parent));
-
-		let child = Rc::new(
+		let child = Rc::new(RefCell::new(
 			Self
 			{
 				parent : Rc::downgrade(parent),
 				children : Vec::new(),
 				data,
-			});
-
-		{			
-			//let parentnode = Rc::get_mut(parent).expect(msg.as_str());		
-			//parentnode.add_child(Rc::clone(&child));			
-			unsafe 
-			{
-				let ptr = Rc::as_ptr(&parent);
-				(*(ptr as *mut Self)).children.push(Rc::clone(&child));// = Rc::downgrade(parent);
-			}
-		}
+			}));
+				
+		//let parentnode = parent.borrow_mut();
+		parent.borrow_mut().add_child(Rc::clone(&child));					
 
 		child
 	}
 
-	fn parent(&self) -> Option<Rc<Self>>
+	fn parent(&self) -> Option<Rc<RefCell<Self>>>
 	{
 		self.parent.upgrade()
 	}
 
-	fn set_parent(&mut self, parent : Option<Rc<Self>>)
+	fn set_parent(&mut self, parent : Option<Rc<RefCell<Self>>>)
 	{
 		self.parent = match parent
 		{
@@ -77,24 +58,19 @@ impl<T> Node<T>
 		};
 	}
 
-	fn children(&self) -> &Vec<Rc<Node<T>>>
+	fn children(&self) -> &Vec<Rc<RefCell<TreeNode<T>>>>
 	{
 		&self.children
 	}
 
-	fn children_mut(&mut self) -> &mut Vec<Rc<Node<T>>>
+	fn children_mut(&mut self) -> &mut Vec<Rc<RefCell<TreeNode<T>>>>
 	{
 		&mut self.children
 	}	
 
-	fn add_child(&mut self, child : Rc<Self>)
+	fn add_child(&mut self, child : Rc<RefCell<Self>>)
 	{
 		self.children.push(child);
-	}
-
-	fn update_lastchild_parent(&mut self)
-	{
-		self.parent = Rc::downgrade(self.children.last().unwrap());
 	}
 
 }
@@ -110,11 +86,11 @@ mod tests
 	#[test]
     fn tree_new() 
     {
-    	let mut root = Node::new_root(WidgetObj);
-    	let child1 = Node::new(&mut root, WidgetObj);
-    	let child2 = Node::new(&mut root, WidgetObj);
-    	let child3 = Node::new(&mut root, WidgetObj);
+    	let mut root = TreeNode::new_root(WidgetObj);
+    	let child1 = TreeNode::new(&mut root, WidgetObj);
+    	let child2 = TreeNode::new(&mut root, WidgetObj);
+    	let child3 = TreeNode::new(&mut root, WidgetObj);
  		
- 		assert_eq!(root.children().len(), 3);
+ 		assert_eq!(root.borrow().children().len(), 3);
     }
 }
