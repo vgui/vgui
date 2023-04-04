@@ -15,6 +15,7 @@ type TreeNodePtr<T> = RcRefCell<TreeNode::<T>>;
 
 pub struct TreeNode<T>
 {
+	weak_self : WeakRefCell<Self>,
 	parent : WeakRefCell<Self>,
 	children : Vec<RcRefCell<Self>>,
 	childindex : usize,
@@ -25,14 +26,18 @@ impl<T> TreeNode<T>
 {
 	pub fn new_root(data : T) -> RcRefCell<Self>
 	{
-		Rc::new(RefCell::new(
+		let root = Rc::new(RefCell::new(
 			Self
 			{
+				weak_self : Weak::new(),
 				parent : Weak::new(),
 				children : Vec::new(),
 				childindex : usize::MAX,
 				data,
-			}))		
+			}));
+
+		root.borrow_mut().weak_self = Rc::downgrade(&root);	
+		root
 	}
 
 	pub fn new(parent : &mut RcRefCell<Self>, data : T) -> RcRefCell<Self>
@@ -40,16 +45,18 @@ impl<T> TreeNode<T>
 		let child = Rc::new(RefCell::new(
 			Self
 			{
+				weak_self : Weak::new(),
 				parent : Rc::downgrade(parent),
 				children : Vec::new(),
 				childindex : usize::MAX,
 				data,
 			}));
-				
-		//parent.borrow_mut().add_child(Rc::clone(&child));					
+		
+		child.borrow_mut().weak_self = Rc::downgrade(&child);
+		let length = parent.borrow_mut().children.len();	
+		parent.borrow_mut().insert_child(length, Rc::clone(&child));		
 		child
 	}
-
 
 	fn parent(&self) -> Option<RcRefCell<Self>>
 	{
@@ -80,11 +87,6 @@ impl<T> TreeNode<T>
 		&mut self.children
 	}	
 
-	/*fn add_child(&mut self, child : RcRefCell<Self>)
-	{
-		self.children.push(child);
-	}*/
-
     fn _update_indexes(&mut self)
     {
     	let mut index : usize = 0;
@@ -110,14 +112,12 @@ impl<T> TreeNode<T>
         self._update_indexes();
         child
     }
-/*
-    fn insert_child(&mut self,  child : RcRefCell<Self>, childindex : usize)
-    {
-        let parent = child.borrow_mut().parent();
 
-        if let Some(parent) = parent
+    fn insert_child(&mut self,  childindex : usize, child : RcRefCell<Self>)
+    {
+        if let Some(parent) = child.borrow_mut().parent()
         {
-        	parent.borrow_mut().remove_child(self.childindex);
+        	parent.borrow_mut().remove_child(child.borrow_mut().childindex);
         }
 
         if childindex >= self.children.len()
@@ -125,10 +125,10 @@ impl<T> TreeNode<T>
             panic!("Too big index for inserting.");
         }
 
-        self.children.insert(childindex, child);
-        child.borrow_mut().parent = Rc::downgrade(self),
+        child.borrow_mut().parent = Weak::clone(&self.weak_self);
+        self.children.insert(childindex, child);        
         self._update_indexes();
-    }*/
+    }
 
 }
 
@@ -142,9 +142,10 @@ mod tests
 
 	fn tree_new_widgetobj(parent : Option<&TreeNodePtr<WidgetObj>>) -> TreeNodePtr<WidgetObj>
 	{
-		Rc::new(RefCell::new(
+		let widgetobj = Rc::new(RefCell::new(
 			TreeNode::<WidgetObj>
 			{
+				weak_self : Weak::new(),
 				parent : match parent
 				{
 					Some(parent) => Rc::downgrade(&parent),
@@ -153,12 +154,16 @@ mod tests
 				children : Vec::new(),
 				childindex : usize::MAX,
 				data : WidgetObj,
-			}))
+			}));
+
+		widgetobj.borrow_mut().weak_self = Rc::downgrade(&widgetobj);
+		widgetobj
 	}
 
 	fn tree_insert_child(parent : &TreeNodePtr<WidgetObj>, child :&TreeNodePtr<WidgetObj>)
 	{
 		parent.borrow_mut().children.push(Rc::clone(&child));
+		child.borrow_mut().parent = Rc::downgrade(&parent);
 	}
 
     #[test]
