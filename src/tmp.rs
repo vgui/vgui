@@ -6,8 +6,8 @@ use std::vec::Vec;
 
 pub struct TreeNode<'a, T>
 {
-	this : Option<&'a Box<Self>>,
-	parent : Option<&'a Box<Self>>,
+	this : Option<&'a mut Box<Self>>,
+	parent : Option<&'a mut Box<Self>>,
 	children : Vec<Box<Self>>,
 	childindex : usize,
 	data : T,
@@ -26,7 +26,7 @@ impl<'a, T> TreeNode<'a, T>
         }
     }
 
-	pub fn new(parent : Option<Box<Self>>,childindex : usize , data : T) -> Box<Self>
+	pub fn new(parent : Option<&'a mut Box<Self>>,childindex : usize , data : T) -> Box<Self>
 	{
 		let mut child = Box::new(
 			Self
@@ -38,7 +38,9 @@ impl<'a, T> TreeNode<'a, T>
 				data,
 			});
 
-		child.this = Some(&child);
+		{
+			child.this = Some(&mut child);
+		}
 		
 		if parent.is_some()
 		{			
@@ -50,7 +52,7 @@ impl<'a, T> TreeNode<'a, T>
 				childindex = parent.children.len();	
 			}
 
-			child.parent = Some(&parent);
+			child.parent = Some(&mut parent);
 			parent.children.insert(childindex, child);
 			parent.update_indexes();
 		}
@@ -70,7 +72,7 @@ impl<'a, T> TreeNode<'a, T>
             panic!("Too big index for removing.");
         }
       
-       	let child = self.children.remove(childindex);
+       	let mut child = self.children.remove(childindex);
        	child.parent = None;
        	child.childindex = usize::MAX;        
         self.update_indexes();
@@ -96,6 +98,7 @@ impl<'a, T> TreeNode<'a, T>
         //If child have parent, remove child from parent using child index.
         if let Some(parent) = child.parent()
         {
+        	//let mut parent = unsafe { Box::from_raw(parent) };
 	       	parent.remove_child(child.childindex);
         }
 
@@ -111,7 +114,7 @@ impl<'a, T> TreeNode<'a, T>
 	{
 	}
 
-	pub fn parent(&self) -> Option<&'a Box<Self>>
+	pub fn parent(&self) -> Option<&'a mut Box<Self>>
 	{
 		self.parent
 	}
