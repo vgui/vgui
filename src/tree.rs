@@ -53,6 +53,7 @@ impl<T> TreeNode<T>
 		{
 			let parent = parent.unwrap().clone();
 			child.borrow_mut().parent = Rc::downgrade(&parent);
+
 			let newchildindex = parent.borrow().children.len();	
 			parent.borrow_mut().children.insert(newchildindex, Rc::clone(&child));
 			parent.borrow_mut().update_indexes();
@@ -149,6 +150,79 @@ mod tests
 		}
 	}
 
+	#[test]
+	pub fn treenode_update_indexes()
+	{
+		let root = Rc::new(RefCell::new(
+		TreeNode
+		{
+			weak_self : Weak::new(),
+			parent : Weak::new(),
+			children : Vec::new(),
+			childindex : usize::MAX,
+			data : WidgetObj::new("root"),
+		}));
+
+		root.borrow_mut().weak_self = Rc::downgrade(&root);
+
+		assert_eq!(Rc::ptr_eq(&root.borrow().weak_self.upgrade().unwrap(), &root), true);		
+		assert_eq!(root.borrow().weak_self.strong_count(), 1);
+		assert_eq!(root.borrow().weak_self.weak_count(), 1);
+		assert_eq!(root.borrow().parent.strong_count(), 0);
+		assert_eq!(root.borrow().parent.weak_count(), 0);
+		assert_eq!(root.borrow().children.len(), 0);
+		assert_eq!(root.borrow().childindex, usize::MAX);
+		assert_eq!(root.borrow().data.id, "root");
+
+		let child0 = Rc::new(RefCell::new(
+		TreeNode
+		{
+			weak_self : Weak::new(),
+			parent : Rc::downgrade(&root),
+			children : Vec::new(),
+			childindex : usize::MAX,
+			data : WidgetObj::new("child0"),
+		}));
+
+		child0.borrow_mut().weak_self = Rc::downgrade(&child0);
+		root.borrow_mut().children.insert(0, Rc::clone(&child0));
+		root.borrow_mut().update_indexes();
+
+		assert_eq!(Rc::ptr_eq(&child0.borrow().weak_self.upgrade().unwrap(), &child0), true);		
+		assert_eq!(child0.borrow().weak_self.strong_count(), 2);//1.root.children[0]; 2.child0
+		assert_eq!(child0.borrow().weak_self.weak_count(), 1);
+		assert_eq!(child0.borrow().parent.strong_count(), 1);
+		assert_eq!(child0.borrow().parent.weak_count(), 2);//1.root.weak_self; 2.child0.parent;
+		assert_eq!(child0.borrow().children.len(), 0);
+		assert_eq!(child0.borrow().childindex, 0);
+		assert_eq!(child0.borrow().data.id, "child0");
+		assert_eq!(root.borrow().children.len(), 1);		
+
+		let child1 = Rc::new(RefCell::new(
+		TreeNode
+		{
+			weak_self : Weak::new(),
+			parent : Rc::downgrade(&root),
+			children : Vec::new(),
+			childindex : usize::MAX,
+			data : WidgetObj::new("child1"),
+		}));
+
+		child1.borrow_mut().weak_self = Rc::downgrade(&child1);
+		root.borrow_mut().children.insert(0, Rc::clone(&child1));
+		root.borrow_mut().update_indexes();
+
+		assert_eq!(Rc::ptr_eq(&child1.borrow().weak_self.upgrade().unwrap(), &child1), true);		
+		assert_eq!(child1.borrow().weak_self.strong_count(), 2);//1.root.children[0]; 2.child1
+		assert_eq!(child1.borrow().weak_self.weak_count(), 1);
+		assert_eq!(child1.borrow().parent.strong_count(), 1);
+		assert_eq!(child1.borrow().parent.weak_count(), 03);//1.root.weak_self; 2.child0.parent;3.child1.parent
+		assert_eq!(child1.borrow().children.len(), 0);
+		assert_eq!(child1.borrow().childindex, 0);
+		assert_eq!(child0.borrow().childindex, 1);
+		assert_eq!(child1.borrow().data.id, "child1");
+		assert_eq!(root.borrow().children.len(), 2);				
+	}
 
 	#[test]
 	pub fn treenode_new()
