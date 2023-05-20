@@ -62,39 +62,10 @@ impl<T> TreeNode<T>
 		child
 	}
 
-	fn parent(&self) -> Option<RcRefCell<Self>>
-	{
-		self.parent.upgrade()
-	}
-
-	fn set_parent(&mut self, parent : Option<RcRefCell<Self>>)
-	{
-		self.parent = match parent
-		{
-			Some(parent) => Rc::downgrade(&parent),
-			None => Weak::new()
-		};
-	}
-
-	fn child(&self, index : usize) -> Option<&RcRefCell<Self>>
-	{
-		self.children.get(index)
-	}
-
-	fn children(&self) -> &Vec<RcRefCell<Self>>
-	{
-		&self.children
-	}
-
-	fn children_mut(&mut self) -> &mut Vec<RcRefCell<Self>>
-	{
-		&mut self.children
-	}	
-
     fn remove_child(&mut self, childindex : usize) -> RcRefCell<Self>
     {
     	//Check child index.
-        if childindex > self.children.len()
+        if childindex >= self.children.len()
         {
             panic!("Too big index for removing.");
         }
@@ -129,6 +100,44 @@ impl<T> TreeNode<T>
         self.update_indexes();
     }
 
+	fn set_parent(&mut self, parent : Option<RcRefCell<Self>>)
+	{
+		self.parent = match parent
+		{
+			Some(parent) => Rc::downgrade(&parent),
+			None => Weak::new()
+		};
+	}
+
+	fn parent(&self) -> Option<RcRefCell<Self>>
+	{
+		self.parent.upgrade()
+	}
+
+	fn child(&self, index : usize) -> Option<&RcRefCell<Self>>
+	{
+		self.children.get(index)
+	}
+
+	fn childindex(&self) -> usize
+	{
+		self.childindex
+	}
+
+	fn children_count(&self) -> usize
+	{
+		self.children.len()
+	}	
+
+	fn data(&self) -> &T
+	{
+		&self.data
+	}	
+
+	fn data_mut(&mut self) -> &mut T
+	{
+		&mut self.data
+	}		
 }
 
 
@@ -170,9 +179,9 @@ mod tests
 		assert_eq!(root.borrow().weak_self.weak_count(), 1);
 		assert_eq!(root.borrow().parent.strong_count(), 0);
 		assert_eq!(root.borrow().parent.weak_count(), 0);
-		assert_eq!(root.borrow().children.len(), 0);
-		assert_eq!(root.borrow().childindex, usize::MAX);
-		assert_eq!(root.borrow().data.id, "root");
+		assert_eq!(root.borrow().children_count(), 0);
+		assert_eq!(root.borrow().childindex(), usize::MAX);
+		assert_eq!(root.borrow().data().id, "root");
 
 		let child0 = Rc::new(RefCell::new(
 		TreeNode
@@ -193,10 +202,10 @@ mod tests
 		assert_eq!(child0.borrow().weak_self.weak_count(), 1);
 		assert_eq!(child0.borrow().parent.strong_count(), 1);
 		assert_eq!(child0.borrow().parent.weak_count(), 2);//1.root.weak_self; 2.child0.parent;
-		assert_eq!(child0.borrow().children.len(), 0);
-		assert_eq!(child0.borrow().childindex, 0);
-		assert_eq!(child0.borrow().data.id, "child0");
-		assert_eq!(root.borrow().children.len(), 1);		
+		assert_eq!(child0.borrow().children_count(), 0);
+		assert_eq!(child0.borrow().childindex(), 0);
+		assert_eq!(child0.borrow().data().id, "child0");
+		assert_eq!(root.borrow().children_count(), 1);		
 
 		let child1 = Rc::new(RefCell::new(
 		TreeNode
@@ -217,11 +226,11 @@ mod tests
 		assert_eq!(child1.borrow().weak_self.weak_count(), 1);
 		assert_eq!(child1.borrow().parent.strong_count(), 1);
 		assert_eq!(child1.borrow().parent.weak_count(), 03);//1.root.weak_self; 2.child0.parent;3.child1.parent
-		assert_eq!(child1.borrow().children.len(), 0);
-		assert_eq!(child1.borrow().childindex, 0);
-		assert_eq!(child0.borrow().childindex, 1);
-		assert_eq!(child1.borrow().data.id, "child1");
-		assert_eq!(root.borrow().children.len(), 2);				
+		assert_eq!(child1.borrow().children_count(), 0);
+		assert_eq!(child1.borrow().childindex(), 0);
+		assert_eq!(child0.borrow().childindex(), 1);
+		assert_eq!(child1.borrow().data().id, "child1");
+		assert_eq!(root.borrow().children_count(), 2);						
 	}
 
 	#[test]
@@ -234,9 +243,9 @@ mod tests
 		assert_eq!(root.borrow().weak_self.weak_count(), 1);
 		assert_eq!(root.borrow().parent.strong_count(), 0);
 		assert_eq!(root.borrow().parent.weak_count(), 0);
-		assert_eq!(root.borrow().children.len(), 0);
-		assert_eq!(root.borrow().childindex, usize::MAX);
-		assert_eq!(root.borrow().data.id, "root");
+		assert_eq!(root.borrow().children_count(), 0);
+		assert_eq!(root.borrow().childindex(), usize::MAX);
+		assert_eq!(root.borrow().data().id, "root");
 
 		let child0 = TreeNode::new(Some(root.clone()), WidgetObj::new("child0"));
 
@@ -245,10 +254,10 @@ mod tests
 		assert_eq!(child0.borrow().weak_self.weak_count(), 1);
 		assert_eq!(child0.borrow().parent.strong_count(), 1);
 		assert_eq!(child0.borrow().parent.weak_count(), 2);//1.root.weak_self; 2.child0.parent;
-		assert_eq!(child0.borrow().children.len(), 0);
-		assert_eq!(child0.borrow().childindex, 0);
-		assert_eq!(child0.borrow().data.id, "child0");
-		assert_eq!(root.borrow().children.len(), 1);
+		assert_eq!(child0.borrow().children_count(), 0);
+		assert_eq!(child0.borrow().childindex(), 0);
+		assert_eq!(child0.borrow().data().id, "child0");
+		assert_eq!(root.borrow().children_count(), 1);		
 
 		let child1 = TreeNode::new(Some(root.clone()), WidgetObj::new("child1"));
 
@@ -257,10 +266,11 @@ mod tests
 		assert_eq!(child1.borrow().weak_self.weak_count(), 1);
 		assert_eq!(child1.borrow().parent.strong_count(), 1);
 		assert_eq!(child1.borrow().parent.weak_count(), 3);//1.root.weak_self; 2.child0.parent; 3.child1.parent
-		assert_eq!(child1.borrow().children.len(), 0);
-		assert_eq!(child1.borrow().childindex, 1);
-		assert_eq!(child1.borrow().data.id, "child1");
-		assert_eq!(root.borrow().children.len(), 2);
+		assert_eq!(child1.borrow().children_count(), 0);
+		assert_eq!(child1.borrow().childindex(), 1);
+		assert_eq!(child0.borrow().childindex(), 0);
+		assert_eq!(child1.borrow().data().id, "child1");
+		assert_eq!(root.borrow().children_count(), 2);						
 
 		let child2 = TreeNode::new(Some(root.clone()), WidgetObj::new("child2"));
 
@@ -269,11 +279,64 @@ mod tests
 		assert_eq!(child2.borrow().weak_self.weak_count(), 1);
 		assert_eq!(child2.borrow().parent.strong_count(), 1);
 		assert_eq!(child2.borrow().parent.weak_count(), 4);//1.root.weak_self; 2.child0.parent; 3.child1.parent; 4.child2.parent
-		assert_eq!(child2.borrow().children.len(), 0);
-		assert_eq!(child2.borrow().childindex, 2);
-		assert_eq!(child2.borrow().data.id, "child2");
-		assert_eq!(root.borrow().children.len(), 3);
-
+		assert_eq!(child2.borrow().children_count(), 0);
+		assert_eq!(child2.borrow().childindex(), 2);
+		assert_eq!(child0.borrow().childindex(), 0);
+		assert_eq!(child1.borrow().childindex(), 1);
+		assert_eq!(child2.borrow().data().id, "child2");
+		assert_eq!(root.borrow().children_count(), 3);						
 	}
 
+	#[test]
+	pub fn treenode_remove_child()
+	{
+		let root = TreeNode::new(None,WidgetObj::new("root"));
+		let child0 = TreeNode::new(Some(root.clone()),WidgetObj::new("child0"));
+		let child1 = TreeNode::new(Some(root.clone()),WidgetObj::new("child1"));
+		let child2 = TreeNode::new(Some(root.clone()),WidgetObj::new("child2"));
+		let child3 = TreeNode::new(Some(root.clone()),WidgetObj::new("child3"));
+		let child4 = TreeNode::new(Some(root.clone()),WidgetObj::new("child4"));
+
+		assert_eq!(child0.borrow().childindex(), 0);
+		assert_eq!(child1.borrow().childindex(), 1);
+		assert_eq!(child2.borrow().childindex(), 2);
+		assert_eq!(child3.borrow().childindex(), 3);
+		assert_eq!(child4.borrow().childindex(), 4);
+		assert_eq!(root.borrow().children_count(), 5);
+
+		let c0 = root.borrow_mut().remove_child(0);
+		assert_eq!(Rc::ptr_eq(&child0.borrow().weak_self.upgrade().unwrap(), &c0), true);				
+		assert_eq!(c0.borrow_mut().childindex(), usize::MAX);
+		assert_eq!(child1.borrow().childindex(), 0);
+		assert_eq!(child2.borrow().childindex(), 1);		
+		assert_eq!(child3.borrow().childindex(), 2);
+		assert_eq!(child4.borrow().childindex(), 3);
+		assert_eq!(root.borrow().children_count(), 4);
+
+		let c3 = root.borrow_mut().remove_child(2);
+		assert_eq!(Rc::ptr_eq(&child3.borrow().weak_self.upgrade().unwrap(), &c3), true);				
+		assert_eq!(c3.borrow_mut().childindex(), usize::MAX);
+		assert_eq!(child1.borrow().childindex(), 0);
+		assert_eq!(child2.borrow().childindex(), 1);		
+		assert_eq!(child4.borrow().childindex(), 2);
+		assert_eq!(root.borrow().children_count(), 3);
+
+		let c4 = root.borrow_mut().remove_child(2);
+		assert_eq!(Rc::ptr_eq(&child4.borrow().weak_self.upgrade().unwrap(), &c4), true);				
+		assert_eq!(c4.borrow_mut().childindex(), usize::MAX);
+		assert_eq!(child1.borrow().childindex(), 0);
+		assert_eq!(child2.borrow().childindex(), 1);
+		assert_eq!(root.borrow().children_count(), 2);	
+
+		let c1 = root.borrow_mut().remove_child(0);
+		assert_eq!(Rc::ptr_eq(&child1.borrow().weak_self.upgrade().unwrap(), &c1), true);				
+		assert_eq!(c1.borrow_mut().childindex(), usize::MAX);
+		assert_eq!(child2.borrow().childindex(), 0);
+		assert_eq!(root.borrow().children_count(), 1);	
+
+		let c2 = root.borrow_mut().remove_child(0);
+		assert_eq!(Rc::ptr_eq(&child2.borrow().weak_self.upgrade().unwrap(), &c2), true);				
+		assert_eq!(c2.borrow_mut().childindex(), usize::MAX);
+		assert_eq!(root.borrow().children_count(), 0);	
+	}
 }
