@@ -81,9 +81,9 @@ impl<T> TreeNode<T>
       
        	let child = self.children.remove(childindex);
        	child.borrow_mut().parent = Weak::new();
-       	child.borrow_mut().childindex = usize::MAX;
-        
+       	child.borrow_mut().childindex = usize::MAX;        
         self.update_indexes();
+
         child
     }
 
@@ -116,13 +116,31 @@ impl<T> TreeNode<T>
         self.update_indexes();
     }
 
-	pub fn set_parent(&mut self, parent : Option<RcRefCell<Self>>)
+	pub fn set_parent(&mut self, parent : Option<RcRefCell<Self>>, childindex : usize)
 	{
-		self.parent = match parent
+		let selfparent : None;
+		let otherparent : None;
+		
+		if self.parent().is_some() && parent.is_some()
 		{
-			Some(parent) => Rc::downgrade(&parent),
-			None => Weak::new()
-		};
+			return;
+		}
+		else
+		if self.parent().is_none() && parent.is_none()
+		{
+			return;
+		}
+
+		if self.parent().is_some()
+		{
+			self.parent().unwrap().borrow_mut().remove_child(self.childindex());
+		}
+
+		if parent.is_some()
+		{
+			let parent = parent.unwrap().clone();
+			parent.borrow_mut().insert_child(childindex, self.weak_self.upgrade().unwrap());
+		}
 	}
 
 	pub fn parent(&self) -> Option<RcRefCell<Self>>
@@ -383,5 +401,5 @@ mod tests
 		assert_eq!(child4.borrow().childindex(), 4);
 		assert_eq!(Rc::ptr_eq(&child4.borrow().parent().unwrap(), &root), true);				
 		assert_eq!(root.borrow().children_count(), 5);
-	}	
+	}
 }
