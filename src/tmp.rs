@@ -87,7 +87,7 @@ impl<'a, T> TreeNode<'a, T>
 			}
 
 			child.parent = Some(&mut parent);
-			parent.children.insert(childindex, child);
+			parent.children.insert(childindex, child.deref_mut());
 			parent.update_indexes();
 		}
 		else 
@@ -98,7 +98,7 @@ impl<'a, T> TreeNode<'a, T>
 		child
 	}
 
-    pub fn remove_child(&mut self, childindex : usize) -> Box<Self>
+    pub fn remove_child(&mut self, childindex : usize) -> &mut Self
     {
     	//Check child index.
         if childindex >= self.children.len()
@@ -114,7 +114,7 @@ impl<'a, T> TreeNode<'a, T>
         child
     }
 
-    pub fn insert_child(&mut self,  childindex : usize, child : Box<Self>)
+    pub fn insert_child(&mut self,  childindex : usize, child : &mut Self)
     {
     	//Check child index.
 		let mut childindex = childindex;
@@ -148,7 +148,7 @@ impl<'a, T> TreeNode<'a, T>
 	{
 	}
 
-	pub fn parent(&self) -> Option<&'a mut Box<Self>>
+	pub fn parent(&self) -> Option<&'a mut Self>
 	{
 		self.parent
 	}
