@@ -2,16 +2,50 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 
+use std::ops::DerefMut;
 use std::vec::Vec;
 
 pub struct TreeNode<'a, T>
 {
-	this : Option<&'a mut Box<Self>>,
-	parent : Option<&'a mut Box<Self>>,
-	children : Vec<Box<Self>>,
+	this : Option<&'a mut Self>,
+	parent : Option<&'a mut Self>,
+	children : Vec<&'a mut Self>,
 	childindex : usize,
 	data : T,
 }
+
+struct ArenaObj<'a, T>
+{
+	arena : Vec<Box<TreeNode<'a, T>>>,
+}
+
+trait Arena<'a, T>
+{
+	fn new() -> ArenaObj<'a, T>;
+	fn alloc(&mut self, parent : Option<&'a mut Box<TreeNode<'a, T>>>, childindex : usize , data : T) -> &mut TreeNode<'a, T>;
+	// fn free(&mut self, obj : &mut T);
+}
+
+impl<'a, T> Arena<'a, T> for ArenaObj<'a, T>
+{	
+	fn new() -> ArenaObj<'a, T>
+	{
+		ArenaObj
+		{
+			arena : Vec::new(),
+		}
+	}
+
+	fn alloc(&mut self, parent : Option<&'a mut Box<TreeNode<'a, T>>>, childindex : usize , data : T) -> &mut TreeNode<'a, T>
+	{
+		self.arena.push
+		(
+			TreeNode::new(parent, childindex, data)
+		);
+
+		self.arena.last().unwrap().deref_mut()
+	}
+} 
 
 impl<'a, T> TreeNode<'a, T>
 {
