@@ -116,31 +116,43 @@ impl<T> TreeNode<T>
         self.update_indexes();
     }
 
-	pub fn set_parent(&mut self, parent : Option<RcRefCell<Self>>, childindex : usize)
+    pub fn set_child_index(&mut self, newchildindex : usize)
+    {
+    	if self.parent().is_none()
+    	{
+    		panic!("The child must have a parent in order to change the index.")
+    	}
+
+    	let mut newchildindex = newchildindex;
+
+    	if newchildindex == usize::MAX
+    	{
+    		newchildindex = self.children_count();    		
+    	}
+
+    	let parent = self.parent().unwrap().clone();
+
+    	///////////
+        ptr_type parent = Parent();
+
+        if(!parent)
+            throw ExceptionInfo << "The child must have a parent to change the index.";
+
+        if(newchildindex == MaxIndex)
+            newchildindex = Childs();
+
+        if(parent->m_children[m_childindex] != &Derived())
+            throw ExceptionInfo << "Current child index is not correct.";
+
+        parent->Relatives<T>::InsertChild(Derived(), newchildindex);
+
+        OnChildIndexChanged(newchildindex);
+        return Derived();
+    }
+
+	pub fn set_parent(&mut self, newparent : Option<RcRefCell<Self>>, newchildindex : usize)
 	{
-		let selfparent : None;
-		let otherparent : None;
-		
-		if self.parent().is_some() && parent.is_some()
-		{
-			return;
-		}
-		else
-		if self.parent().is_none() && parent.is_none()
-		{
-			return;
-		}
-
-		if self.parent().is_some()
-		{
-			self.parent().unwrap().borrow_mut().remove_child(self.childindex());
-		}
-
-		if parent.is_some()
-		{
-			let parent = parent.unwrap().clone();
-			parent.borrow_mut().insert_child(childindex, self.weak_self.upgrade().unwrap());
-		}
+		unimplemented!();
 	}
 
 	pub fn parent(&self) -> Option<RcRefCell<Self>>
@@ -402,4 +414,20 @@ mod tests
 		assert_eq!(Rc::ptr_eq(&child4.borrow().parent().unwrap(), &root), true);				
 		assert_eq!(root.borrow().children_count(), 5);
 	}
+
+	//#[test]
+	pub fn treenode_set_parent()
+	{
+		let root = TreeNode::new(None, usize::MAX, WidgetObj::new("root"));
+		let child0 = TreeNode::new(None, usize::MAX, WidgetObj::new("child0"));
+		let child1 = TreeNode::new(None, usize::MAX, WidgetObj::new("child1"));
+		let child2 = TreeNode::new(None, usize::MAX, WidgetObj::new("child2"));
+		let child3 = TreeNode::new(None, usize::MAX, WidgetObj::new("child3"));
+		let child4 = TreeNode::new(None, usize::MAX, WidgetObj::new("child4"));
+
+		child4.borrow_mut().set_parent(Some(root.clone()), 0);
+		assert_eq!(child0.borrow().childindex(), 0);
+		assert_eq!(Rc::ptr_eq(&child4.borrow().parent().unwrap(), &root), true);				
+
+	}	
 }
