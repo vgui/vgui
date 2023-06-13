@@ -51,7 +51,8 @@ impl<'a, T> Index<usize> for UniqueVec<'a, T>
 }
 
 #[cfg(test)]
-mod tests {
+mod tests 
+{
     use super::*;
     use crate::rcrefcell::RcRefCell;
 
@@ -88,5 +89,8 @@ mod tests {
         vec.insert(2, &w2);
 
         assert_eq!(&vec[0], &w0);
+        //println!("vec - {} , widget - {}", &vec[0], &w0);
+        assert_eq!(&vec[1], &w1);
+        assert_eq!(&vec[2], &w2);
     }
 }

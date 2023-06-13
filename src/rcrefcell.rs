@@ -2,6 +2,7 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::ops::Deref;
+use std::fmt::{Formatter, Result, Display};
 
 
 #[derive(Debug)]
@@ -58,3 +59,12 @@ impl<T> Deref for RcRefCell<T>
         &self.0
     }
 }
+
+/*impl<T> Display for RcRefCell<T> 
+{
+    fn fmt(&self, f: &mut Formatter) -> Result 
+    {
+        write!(f, "{}", &self.0.fmt(f))
+    }
+}*/
+
