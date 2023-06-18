@@ -28,7 +28,16 @@ impl<'a, T: Clone + PartialEq + Eq + Hash + 'a> UniqueVec<'a, T>
 
     pub fn find(&mut self, value: T) -> usize 
     {
-        self.vec.iter().position(|v| v == &value).unwrap()
+        let index = self.vec.iter().position(|v| v == &value);
+
+        if index.is_some()
+        {
+            index.unwrap()
+        }
+        else
+        {
+            usize::MAX
+        }
     }
 
     pub fn insert(&mut self, index: usize, value : &T) 
@@ -75,7 +84,7 @@ mod tests
     }
 
     #[test]
-    pub fn unique_vec_find() 
+    pub fn unique_vec_insert() 
     {
     	let w0 = RcRefCell::new(WidgetObj::new("widget0"));
         let w1 = RcRefCell::new(WidgetObj::new("widget1"));
@@ -88,9 +97,29 @@ mod tests
         vec.insert(1, &w1);
         vec.insert(2, &w2);
 
-        assert_eq!(&vec[0], &w0);
-        //println!("vec - {} , widget - {}", &vec[0], &w0);
+        assert_eq!(&vec[0], &w0);        
         assert_eq!(&vec[1], &w1);
         assert_eq!(&vec[2], &w2);
     }
+
+    #[test]
+    pub fn unique_vec_find() 
+    {
+        let w0 = RcRefCell::new(WidgetObj::new("widget0"));
+        let w1 = RcRefCell::new(WidgetObj::new("widget1"));
+        let w2 = RcRefCell::new(WidgetObj::new("widget2"));
+
+        let mut set = HashSet::<RcRefCell<WidgetObj>>::new();
+        let mut vec = UniqueVec::<RcRefCell<WidgetObj>>::new(&mut set);
+
+        vec.insert(0, &w0);
+        vec.insert(1, &w1);
+        vec.insert(2, &w2);
+
+        assert_eq!(vec.find(w0), 0);
+        assert_eq!(vec.find(w1), 1);
+        assert_eq!(vec.find(w2), 2);
+    }
+
+
 }
