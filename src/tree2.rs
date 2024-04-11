@@ -10,8 +10,8 @@ use std::any::Any;
 
 pub struct Tree<'a, T>
 {
-	//weak_self : &'a Box<Self>,
-	parent : Option<&'a mut Box<Self>>,
+	weak_self : Option<&'a mut Box<Self>>,
+	parent : Option<&'a mut Self>,
 	children : Vec<Box<Self>>,
 	childindex : usize,
 	data : T,
@@ -30,20 +30,35 @@ impl<'a, T> Tree<'a, T>
         }
     }
 
-
-	pub fn new(parent : Option<&'a mut Box<Self>>,childindex : usize , data : T) -> Box<Self>
+	pub fn new(parent : Option<&'a mut Self>,childindex : usize , data : T) -> Box<Self>
 	{
 		let child = Box::new(
 			Self
 			{
-				//weak_self : Weak::new(),
-				parent : parent,
+				weak_self : None,
+				parent : None,
 				children : Vec::new(),
 				childindex : usize::MAX,
 				data,
 			});
+		
+		//child.weak_self = Some(&child);
 
-		child		
+		if parent.is_some()
+		{			
+			let mut childindex = childindex;
+
+			if childindex == usize::MAX
+			{
+				childindex = parent.unwrap().children.len();	
+			}
+
+			parent.unwrap().children.insert(childindex, child);
+			parent.unwrap().update_indexes(childindex);
+			child.parent = parent;
+		}
+		
+		child
 	}
 
     pub fn remove(&mut self, childindex : usize) -> Box<Self>
@@ -54,7 +69,7 @@ impl<'a, T> Tree<'a, T>
             panic!("Too big index for removing.");
         }
       
-       	let mut child = self.children.remove(childindex);
+       	let child = self.children.remove(childindex);
        	child.parent = None;
        	child.childindex = usize::MAX;        
         self.update_indexes(childindex);
@@ -84,19 +99,32 @@ impl<'a, T> Tree<'a, T>
         }
 
         //Set parent for child.
-        //child.parent = Weak::clone(&self.weak_self);
+        child.parent = Some(&mut self);
 
         //Insert child to children and update indexes.
         self.children.insert(childindex, child);        
         self.update_indexes(childindex);
     }
 
-	pub fn parent(&mut self) -> Option<& mut Box<Self>>
+	pub fn set_parent(&mut self, newparent : Option<&Box<Self>>, childindex : usize)
+	{
+		if let Some(parent) = self.parent()
+		{
+			parent.remove(self.childindex());
+		}
+
+		if let Some(newparent) = newparent
+		{
+			newparent.insert(childindex, *self.weak_self.unwrap());			
+		}
+	}
+
+	pub fn parent(&self) -> Option<&'a mut Self>
 	{
 		self.parent
 	}
 
-	pub fn child(&self, index : usize) -> Option<&Box<Self>>
+	pub fn child(&'a self, index : usize) -> Option<&'a Box<Self>>
 	{
 		self.children.get(index)
 	}
@@ -120,5 +148,4 @@ impl<'a, T> Tree<'a, T>
 	{
 		&mut self.data
 	}		
-
 }
