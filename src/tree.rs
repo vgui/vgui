@@ -4,13 +4,15 @@
 
 use std::vec::Vec;
 use std::rc::{Rc, Weak};
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefCell, Ref, RefMut};
 use std::any::Any;
+use std::ops::{Deref, DerefMut};
 
 
+//struct RcRefCell<T>(Rc<RefCell<T>>);
 type RcRefCell<T> = Rc<RefCell<T>>;
 type WeakRefCell<T> = Weak<RefCell<T>>;
-type TreePtr<T> = RcRefCell<Tree::<T>>;
+type TreePtr<T> = RcRefCell<Tree<T>>;
 
 
 pub struct Tree<T>
@@ -21,18 +23,94 @@ pub struct Tree<T>
 	childindex : usize,
 	data : T,
 }
-
-
-pub trait TreeT<T>
+/*
+impl<T> Deref for RcRefCell<Tree<T>>
 {
-	fn update_indexes(&mut self, start_index : usize);
-	fn remove(&mut self, childindex : usize) -> RcRefCell<Tree<T>>;
-    fn insert(&mut self,  childindex : usize, child : &mut Self);	
-	fn set_parent(&mut self, newparent : &mut Self, childindex : usize);
+	type Target<'a> = RefMut<'a, Tree<T>> where T: 'a;
+
+    fn deref(&self) -> &mut Self::Target 
+    {
+        &self.0.borrow_mut()
+    }
 }
 
-impl<T> TreeT<T> for RefMut<'_, Tree<T>>
+impl<'a, T: ?Sized> Deref for RefMut<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &*self.inner
+    }
+}
+
+impl<'a, T: ?Sized> DerefMut for RefMut<'a, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut *self.inner
+    }
+}
+*/
+pub trait TreeT<T>
 {
+	//fn remove(&mut self, childindex : usize) -> RcRefCell<Tree<T>>;
+    //fn insert(&mut self,  childindex : usize, child : &mut Self);	
+	fn set_parent(&mut self, newparent : &mut Self, childindex : usize);
+	/*fn parent(&self) -> Option<RcRefCell<Tree<T>>>;
+	fn child(&self, index : usize) -> Option<&RcRefCell<Tree<T>>>;
+	fn childindex(&self) -> usize;
+	fn children_count(&self) -> usize;
+	fn data(&self) -> &T;
+	fn data_mut(&mut self) -> &mut T;*/
+
+}
+
+
+impl<T> TreeT<T> for RefMut<'_, Tree<T>>
+{ 
+ 	fn set_parent(&mut self, newparent : &mut Self, childindex : usize)
+	{
+		if let Some(parent) = self.parent()
+		{
+			parent.borrow_mut().remove(self.childindex());
+		}
+
+		newparent.insert(childindex, self);		
+	}
+}
+
+
+impl<T> Tree<T>
+{	
+	pub fn new(parent : Option<RcRefCell<Self>>,childindex : usize , data : T) -> RcRefCell<Self>
+	{
+		let child = Rc::new(RefCell::new(
+			Self
+			{
+				weak_self : Weak::new(),
+				parent : Weak::new(),
+				children : Vec::new(),
+				childindex : usize::MAX,
+				data,
+			}));
+		
+		child.borrow_mut().weak_self = Rc::downgrade(&child);
+
+		if parent.is_some()
+		{			
+			let parent = parent.unwrap().clone();
+			let mut childindex = childindex;
+
+			if childindex == usize::MAX
+			{
+				childindex = parent.borrow().children.len();	
+			}
+
+			child.borrow_mut().parent = Rc::downgrade(&parent);
+			parent.borrow_mut().children.insert(childindex, Rc::clone(&child));
+			parent.borrow_mut().update_indexes(childindex);
+		}
+		
+		child
+	}
+
     fn update_indexes(&mut self, start_index : usize)
     {
     	let mut index : usize = start_index;
@@ -90,7 +168,7 @@ impl<T> TreeT<T> for RefMut<'_, Tree<T>>
         self.update_indexes(childindex+1);
     }
 
-	fn set_parent(&mut self, newparent : &mut Self, childindex : usize)
+ 	fn set_parent(&mut self, newparent : &mut Self, childindex : usize)
 	{
 		if let Some(parent) = self.parent()
 		{
@@ -99,133 +177,7 @@ impl<T> TreeT<T> for RefMut<'_, Tree<T>>
 
 		newparent.insert(childindex, self);		
 	}
-}
-
-impl<T> Tree<T>
-{
-	pub fn new(parent : Option<RcRefCell<Self>>,childindex : usize , data : T) -> RcRefCell<Self>
-	{
-		let child = Rc::new(RefCell::new(
-			Self
-			{
-				weak_self : Weak::new(),
-				parent : Weak::new(),
-				children : Vec::new(),
-				childindex : usize::MAX,
-				data,
-			}));
-		
-		child.borrow_mut().weak_self = Rc::downgrade(&child);
-
-		if parent.is_some()
-		{			
-			let parent = parent.unwrap().clone();
-			let mut childindex = childindex;
-
-			if childindex == usize::MAX
-			{
-				childindex = parent.borrow().children.len();	
-			}
-
-			child.borrow_mut().parent = Rc::downgrade(&parent);
-			parent.borrow_mut().children.insert(childindex, Rc::clone(&child));
-			parent.borrow_mut().update_indexes(childindex);
-		}
-		// else 
-		// {
-		// 	assert_eq!(childindex == usize::MAX, true);
-		// }
-		
-		child
-	}
-
-    /*pub fn remove(&mut self, childindex : usize) -> RcRefCell<Self>
-    {
-    	//Check child index.
-        if childindex >= self.children.len()
-        {
-            panic!("Too big index for removing.");
-        }
-      
-       	let child = self.children.remove(childindex);
-       	child.borrow_mut().parent = Weak::new();
-       	child.borrow_mut().childindex = usize::MAX;        
-        self.update_indexes(childindex);
-
-        child
-    }
-
-    pub fn insert(&mut self,  childindex : usize, child : RcRefCell<Self>)
-    {
-    	//Check child index.
-		let mut childindex = childindex;
-
-		if childindex == usize::MAX
-		{
-			childindex = self.children.len();	
-		}
-
-        if childindex > self.children.len()
-        {
-            panic!("Too big index for inserting.");
-        }
-
-        //If child have parent, remove child from parent using child index.
-        if let Some(parent) = child.borrow_mut().parent()
-        {
-	       	parent.borrow_mut().remove(child.borrow().childindex);
-        }
-
-        //Set parent for child.
-        child.borrow_mut().parent = Weak::clone(&self.weak_self);
-
-        //Insert child to children and update indexes.
-        self.children.insert(childindex, child);        
-        self.update_indexes(childindex);
-    }
-
-	fn _insert(&mut self,  childindex : usize, child : RcRefCell<Self>)
-    {
-    	//Check child index.
-		let mut childindex = childindex;
-
-		if childindex == usize::MAX
-		{
-			childindex = self.children.len();	
-		}
-
-        if childindex > self.children.len()
-        {
-            panic!("Too big index for inserting.");
-        }
-
-        //If child have parent, remove child from parent using child index.
-        if let Some(parent) = child.borrow().parent()
-        {
-	       	parent.borrow_mut().remove(child.borrow().childindex);
-        }
-
-        //Set parent for child.
-        child.borrow_mut().parent = Weak::clone(&self.weak_self);
-
-        //Insert child to children and update indexes.
-        self.children.insert(childindex, child);        
-        self.update_indexes(childindex);
-    }
-
-	pub fn set_parent(&mut self, newparent : Option<RcRefCell<Self>>, childindex : usize)
-	{
-		if let Some(parent) = self.parent()
-		{
-			parent.borrow_mut().remove(self.childindex());
-		}
-
-		if let Some(newparent) = newparent
-		{
-			newparent.borrow_mut().insert(childindex, self.weak_self.upgrade().unwrap());
-		}
-	}*/
-
+	
 	pub fn parent(&self) -> Option<RcRefCell<Self>>
 	{
 		self.parent.upgrade()
@@ -308,9 +260,10 @@ mod tests
 			children : Vec::new(),
 			childindex : usize::MAX,
 			data : WidgetObj::new("child0"),
-		}));
+		}));		
 
 		child0.borrow_mut().weak_self = Rc::downgrade(&child0);
+		//root.borrow_mut().children.insert(0, RcRefCell::clone(&child0));
 		root.borrow_mut().children.insert(0, Rc::clone(&child0));
 		root.borrow_mut().update_indexes(0);
 
