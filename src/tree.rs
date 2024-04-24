@@ -9,7 +9,6 @@ use std::any::Any;
 use std::ops::{Deref, DerefMut};
 
 
-//struct RcRefCell<T>(Rc<RefCell<T>>);
 type RcRefCell<T> = Rc<RefCell<T>>;
 type WeakRefCell<T> = Weak<RefCell<T>>;
 type TreePtr<T> = RcRefCell<Tree<T>>;
@@ -23,59 +22,6 @@ pub struct Tree<T>
 	childindex : usize,
 	data : T,
 }
-/*
-impl<T> Deref for RcRefCell<Tree<T>>
-{
-	type Target<'a> = RefMut<'a, Tree<T>> where T: 'a;
-
-    fn deref(&self) -> &mut Self::Target 
-    {
-        &self.0.borrow_mut()
-    }
-}
-
-impl<'a, T: ?Sized> Deref for RefMut<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        &*self.inner
-    }
-}
-
-impl<'a, T: ?Sized> DerefMut for RefMut<'a, T> {
-    fn deref_mut(&mut self) -> &mut T {
-        &mut *self.inner
-    }
-}
-*/
-pub trait TreeT<T>
-{
-	//fn remove(&mut self, childindex : usize) -> RcRefCell<Tree<T>>;
-    //fn insert(&mut self,  childindex : usize, child : &mut Self);	
-	fn set_parent(&mut self, newparent : &mut Self, childindex : usize);
-	/*fn parent(&self) -> Option<RcRefCell<Tree<T>>>;
-	fn child(&self, index : usize) -> Option<&RcRefCell<Tree<T>>>;
-	fn childindex(&self) -> usize;
-	fn children_count(&self) -> usize;
-	fn data(&self) -> &T;
-	fn data_mut(&mut self) -> &mut T;*/
-
-}
-
-
-impl<T> TreeT<T> for RefMut<'_, Tree<T>>
-{ 
- 	fn set_parent(&mut self, newparent : &mut Self, childindex : usize)
-	{
-		if let Some(parent) = self.parent()
-		{
-			parent.borrow_mut().remove(self.childindex());
-		}
-
-		newparent.insert(childindex, self);		
-	}
-}
-
 
 impl<T> Tree<T>
 {	
@@ -177,7 +123,7 @@ impl<T> Tree<T>
 
 		newparent.insert(childindex, self);		
 	}
-	
+
 	pub fn parent(&self) -> Option<RcRefCell<Self>>
 	{
 		self.parent.upgrade()
