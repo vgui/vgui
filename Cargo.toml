@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 druid-shell = "0.8.3"
-#tracing-subscriber = "0.3.16"
 piet-common = "0.6.2"
+kurbo = "0.6.2"

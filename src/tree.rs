@@ -68,7 +68,7 @@ impl<T> Tree<T>
         }
     }
 
-    fn remove(&mut self, childindex : usize) -> RcRefCell<Tree<T>>
+    pub fn remove(&mut self, childindex : usize) -> RcRefCell<Tree<T>>
     {
     	//Check child index.
         if childindex >= self.children.len()
@@ -84,7 +84,7 @@ impl<T> Tree<T>
         child
     }
 
-    fn insert(&mut self,  childindex : usize, child : &mut Self)
+    pub fn insert(&mut self,  childindex : usize, child : &mut Self)
     {
     	//Check child index.
 		let mut childindex = childindex;
@@ -114,7 +114,7 @@ impl<T> Tree<T>
         self.update_indexes(childindex+1);
     }
 
- 	fn set_parent(&mut self, newparent : &mut Self, childindex : usize)
+ 	pub fn set_parent(&mut self, newparent : &mut Self, childindex : usize)
 	{
 		if let Some(parent) = self.parent()
 		{
@@ -153,6 +153,20 @@ impl<T> Tree<T>
 	{
 		&mut self.data
 	}		
+}
+
+
+pub trait TreeT<T>
+{	
+    fn remove(&mut self, childindex : usize) -> RcRefCell<Tree<T>>;
+    fn insert(&mut self,  childindex : usize, child : &mut Self);
+ 	fn set_parent(&mut self, newparent : &mut Self, childindex : usize);
+	fn parent(&self) -> Option<RcRefCell<Self>>;
+	fn child(&self, index : usize) -> Option<&RcRefCell<Self>>;
+	fn childindex(&self) -> usize;
+	fn children_count(&self) -> usize;
+	fn data(&self) -> &T;
+	fn data_mut(&mut self) -> &mut T;
 }
 
 
