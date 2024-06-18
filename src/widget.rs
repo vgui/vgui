@@ -6,12 +6,12 @@
 use druid_shell::{ Region, KeyEvent, MouseEvent };
 use piet_common::Piet;
 use kurbo::Size;
-use crate::tree::Tree;
+use crate::tree2::{ TreeNode, Tree };
 
 
 pub struct Panel
 {
-	tree : Tree<Box<dyn Widget>>,
+	tree : TreeNode,
 }
 
 

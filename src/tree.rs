@@ -434,6 +434,8 @@ mod tests
 
 	pub trait Widget
 	{	
+		type TreeType;
+		fn tree(&mut self) -> Self::TreeType;
     	fn paint(&mut self){}
 		fn size(&mut self) {}
     	fn mouse_move(&mut self) {}
@@ -452,24 +454,14 @@ mod tests
 
 	struct Container
 	{
-		tree : RcRefCell<TreeNode<Box<dyn Widget>>>,
+		tree : RcRefCell<TreeNode<RcRefCell<Box<dyn Widget>>>>,
 		id : String,		
 	}
 
-	impl Container
-	{
-		pub fn new(parent : Option<RcRefCell<TreeNode<Box<dyn Widget>>>>, id : &str) -> Box<Container>
-		{
-			Box::new(Container
-			{
-				tree : TreeNode::new(parent, 0, Box::new(NullContainer::new())),
-				id : String::from(id), 
-			})
-		}
-	}
-
 	impl Widget for NullContainer
-	{	
+	{
+		type TreeType = RcRefCell<TreeNode<RcRefCell<dyn Widget>>>;
+		fn tree(&mut self) -> RcRefCell<TreeNode<RcRefCell<dyn Widget>>>{  }
     	fn paint(&mut self){}
 	    fn size(&mut self) {}
     	fn mouse_move(&mut self) {}
@@ -478,10 +470,27 @@ mod tests
 
 	impl Widget for Container
 	{	
+		type TreeType = RcRefCell<TreeNode<RcRefCell<dyn Widget>>>;
+		fn tree(&mut self) -> RcRefCell<TreeNode<RcRefCell<dyn Widget>>>{ self.tree }
     	fn paint(&mut self){}
 	    fn size(&mut self) {}
     	fn mouse_move(&mut self) {}
     	fn destroy(&mut self) {}
+	}
+
+	impl Container
+	{
+		pub fn new(parent : Option<RcRefCell<TreeNode<RcRefCell<dyn Widget>>>>, id : &str) -> RcRefCell<dyn Widget>
+		{
+			let container : RcRefCell<dyn Widget> = Rc::new(RefCell::new(Container
+			{
+				tree : TreeNode::new(parent, 0, Rc::new(RefCell::new(NullContainer::new()))),
+				id : String::from(id), 
+			}));
+
+			container.borrow_mut().tree.borrow_mut().data = Rc::clone(&container);
+			container
+		}
 	}
 
 	#[test]
