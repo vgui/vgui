@@ -7,7 +7,6 @@ use std::rc::{Rc, Weak};
 use std::cell::{RefCell, Ref, RefMut};
 use std::any::Any;
 use std::ops::{Deref, DerefMut};
-use crate::widget::Widget;
 
 
 type RcRefCell<T> = Rc<RefCell<T>>;
@@ -21,12 +20,12 @@ pub struct TreeNode
 	parent : WeakRefCell<Self>,
 	children : Vec<RcRefCell<Self>>,
 	childindex : usize,
-	data : dyn Widget,
+	data : Box<dyn Any>,
 }
 
 impl TreeNode
 {	
-	pub fn new(parent : Option<RcRefCell<Self>>,childindex : usize , data : impl Widget) -> RcRefCell<Self>
+	pub fn new(parent : Option<RcRefCell<Self>>,childindex : usize , data : Box<dyn Any>) -> RcRefCell<Self>
 	{
 		let child = Rc::new(RefCell::new(
 			Self
@@ -149,21 +148,16 @@ impl TreeNode
 		self.children.len()
 	}	
 
-	pub fn data(&self) -> impl Widget
+	pub fn data<T: 'static>(&self) -> Option<&T>
 	{
-		&self.data
+		self.data.downcast_ref::<T>()
 	}	
-
-	pub fn data_mut(&mut self) -> impl Widget
-	{
-		&mut self.data
-	}		
 }
 
 
 pub trait Tree<T>
 {	
-    fn remove(&mut self, childindex : usize) -> RcRefCell<TreeNode<T>>;
+    fn remove(&mut self, childindex : usize) -> RcRefCell<TreeNode>;
     fn insert(&mut self,  childindex : usize, child : &mut Self);
  	fn set_parent(&mut self, newparent : &mut Self, childindex : usize);
 	fn parent(&self) -> Option<RcRefCell<Self>>;
@@ -203,7 +197,7 @@ mod tests
 			parent : Weak::new(),
 			children : Vec::new(),
 			childindex : usize::MAX,
-			data : WidgetObj::new("root"),
+			data : Box::new(WidgetObj::new("root")),
 		}));
 
 		root.borrow_mut().weak_self = Rc::downgrade(&root);
@@ -215,7 +209,7 @@ mod tests
 		assert_eq!(root.borrow().parent.weak_count(), 0);
 		assert_eq!(root.borrow().children_count(), 0);
 		assert_eq!(root.borrow().childindex(), usize::MAX);
-		assert_eq!(root.borrow().data().id, "root");
+		assert_eq!(root.borrow().data::<WidgetObj>().unwrap().id, "root");
 
 		let child0 = Rc::new(RefCell::new(
 		TreeNode
@@ -224,7 +218,7 @@ mod tests
 			parent : Rc::downgrade(&root),
 			children : Vec::new(),
 			childindex : usize::MAX,
-			data : WidgetObj::new("child0"),
+			data : Box::new(WidgetObj::new("child0")),
 		}));		
 
 		child0.borrow_mut().weak_self = Rc::downgrade(&child0);
@@ -238,7 +232,7 @@ mod tests
 		assert_eq!(child0.borrow().parent.weak_count(), 2);//1.root.weak_self; 2.child0.parent;
 		assert_eq!(child0.borrow().children_count(), 0);
 		assert_eq!(child0.borrow().childindex(), 0);
-		assert_eq!(child0.borrow().data().id, "child0");
+		assert_eq!(child0.borrow().data::<WidgetObj>().unwrap().id, "child0");
 		assert_eq!(root.borrow().children_count(), 1);		
 
 		let child1 = Rc::new(RefCell::new(
@@ -248,7 +242,7 @@ mod tests
 			parent : Rc::downgrade(&root),
 			children : Vec::new(),
 			childindex : usize::MAX,
-			data : WidgetObj::new("child1"),
+			data : Box::new(WidgetObj::new("child1")),
 		}));
 
 		child1.borrow_mut().weak_self = Rc::downgrade(&child1);
@@ -263,14 +257,14 @@ mod tests
 		assert_eq!(child1.borrow().children_count(), 0);
 		assert_eq!(child1.borrow().childindex(), 0);
 		assert_eq!(child0.borrow().childindex(), 1);
-		assert_eq!(child1.borrow().data().id, "child1");
+		assert_eq!(child1.borrow().data::<WidgetObj>().unwrap().id, "child1");
 		assert_eq!(root.borrow().children_count(), 2);						
 	}
 
 	#[test]
 	pub fn tree_new()
 	{
-		let root = TreeNode::new(None,usize::MAX, WidgetObj::new("root"));
+		let root = TreeNode::new(None,usize::MAX, Box::new(WidgetObj::new("root")));
 
 		assert_eq!(Rc::ptr_eq(&root.borrow().weak_self.upgrade().unwrap(), &root), true);		
 		assert_eq!(root.borrow().weak_self.strong_count(), 1);
@@ -279,9 +273,9 @@ mod tests
 		assert_eq!(root.borrow().parent.weak_count(), 0);
 		assert_eq!(root.borrow().children_count(), 0);
 		assert_eq!(root.borrow().childindex(), usize::MAX);
-		assert_eq!(root.borrow().data().id, "root");
+		assert_eq!(root.borrow().data::<WidgetObj>().unwrap().id, "root");
 
-		let child0 = TreeNode::new(Some(root.clone()),usize::MAX, WidgetObj::new("child0"));
+		let child0 = TreeNode::new(Some(root.clone()),usize::MAX, Box::new(WidgetObj::new("child0")));
 
 		assert_eq!(Rc::ptr_eq(&child0.borrow().weak_self.upgrade().unwrap(), &child0), true);		
 		assert_eq!(child0.borrow().weak_self.strong_count(), 2);//1.root.children[0]; 2.child0
@@ -290,10 +284,10 @@ mod tests
 		assert_eq!(child0.borrow().parent.weak_count(), 2);//1.root.weak_self; 2.child0.parent;
 		assert_eq!(child0.borrow().children_count(), 0);
 		assert_eq!(child0.borrow().childindex(), 0);
-		assert_eq!(child0.borrow().data().id, "child0");
+		assert_eq!(child0.borrow().data::<WidgetObj>().unwrap().id, "child0");
 		assert_eq!(root.borrow().children_count(), 1);		
 
-		let child1 = TreeNode::new(Some(root.clone()),usize::MAX, WidgetObj::new("child1"));
+		let child1 = TreeNode::new(Some(root.clone()),usize::MAX, Box::new(WidgetObj::new("child1")));
 
 		assert_eq!(Rc::ptr_eq(&child1.borrow().weak_self.upgrade().unwrap(), &child1), true);		
 		assert_eq!(child1.borrow().weak_self.strong_count(), 2);//1.root.children[1]; 2.child1
@@ -303,10 +297,10 @@ mod tests
 		assert_eq!(child1.borrow().children_count(), 0);
 		assert_eq!(child1.borrow().childindex(), 1);
 		assert_eq!(child0.borrow().childindex(), 0);
-		assert_eq!(child1.borrow().data().id, "child1");
+		assert_eq!(child1.borrow().data::<WidgetObj>().unwrap().id, "child1");
 		assert_eq!(root.borrow().children_count(), 2);						
 
-		let child2 = TreeNode::new(Some(root.clone()),usize::MAX, WidgetObj::new("child2"));
+		let child2 = TreeNode::new(Some(root.clone()),usize::MAX, Box::new(WidgetObj::new("child2")));
 
 		assert_eq!(Rc::ptr_eq(&child2.borrow().weak_self.upgrade().unwrap(), &child2), true);		
 		assert_eq!(child2.borrow().weak_self.strong_count(), 2);//1.root.children[2]; 2.child2
@@ -317,19 +311,19 @@ mod tests
 		assert_eq!(child2.borrow().childindex(), 2);
 		assert_eq!(child1.borrow().childindex(), 1);		
 		assert_eq!(child0.borrow().childindex(), 0);
-		assert_eq!(child2.borrow().data().id, "child2");
+		assert_eq!(child2.borrow().data::<WidgetObj>().unwrap().id, "child2");
 		assert_eq!(root.borrow().children_count(), 3);						
 	}
 
 	#[test]
 	pub fn tree_remove()
 	{
-		let root = TreeNode::new(None,usize::MAX, WidgetObj::new("root"));
-		let child0 = TreeNode::new(Some(root.clone()),usize::MAX, WidgetObj::new("child0"));
-		let child1 = TreeNode::new(Some(root.clone()),usize::MAX, WidgetObj::new("child1"));
-		let child2 = TreeNode::new(Some(root.clone()),usize::MAX, WidgetObj::new("child2"));
-		let child3 = TreeNode::new(Some(root.clone()),usize::MAX, WidgetObj::new("child3"));
-		let child4 = TreeNode::new(Some(root.clone()),usize::MAX, WidgetObj::new("child4"));
+		let root = TreeNode::new(None,usize::MAX, Box::new(WidgetObj::new("root")));
+		let child0 = TreeNode::new(Some(root.clone()),usize::MAX, Box::new(WidgetObj::new("child0")));
+		let child1 = TreeNode::new(Some(root.clone()),usize::MAX, Box::new(WidgetObj::new("child1")));
+		let child2 = TreeNode::new(Some(root.clone()),usize::MAX, Box::new(WidgetObj::new("child2")));
+		let child3 = TreeNode::new(Some(root.clone()),usize::MAX, Box::new(WidgetObj::new("child3")));
+		let child4 = TreeNode::new(Some(root.clone()),usize::MAX, Box::new(WidgetObj::new("child4")));
 
 		assert_eq!(child0.borrow().childindex(), 0);
 		assert_eq!(child1.borrow().childindex(), 1);
@@ -377,12 +371,12 @@ mod tests
 	#[test]
 	pub fn tree_insert()
 	{
-		let root = TreeNode::new(None, usize::MAX, WidgetObj::new("root"));
-		let child0 = TreeNode::new(None, usize::MAX, WidgetObj::new("child0"));
-		let child1 = TreeNode::new(None, usize::MAX, WidgetObj::new("child1"));
-		let child2 = TreeNode::new(None, usize::MAX, WidgetObj::new("child2"));
-		let child3 = TreeNode::new(None, usize::MAX, WidgetObj::new("child3"));
-		let child4 = TreeNode::new(None, usize::MAX, WidgetObj::new("child4"));
+		let root = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("root")));
+		let child0 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child0")));
+		let child1 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child1")));
+		let child2 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child2")));
+		let child3 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child3")));
+		let child4 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child4")));
 
 		root.borrow_mut().insert(0, &mut child4.borrow_mut());
 		root.borrow_mut().insert(0, &mut child3.borrow_mut());
@@ -406,12 +400,12 @@ mod tests
 	#[test]
 	pub fn tree_set_parent()
 	{
-		let root = TreeNode::new(None, usize::MAX, WidgetObj::new("root"));
-		let child0 = TreeNode::new(None, usize::MAX, WidgetObj::new("child0"));
-		let child1 = TreeNode::new(None, usize::MAX, WidgetObj::new("child1"));
-		let child2 = TreeNode::new(None, usize::MAX, WidgetObj::new("child2"));
-		let child3 = TreeNode::new(None, usize::MAX, WidgetObj::new("child3"));
-		let child4 = TreeNode::new(None, usize::MAX, WidgetObj::new("child4"));
+		let root = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("root")));
+		let child0 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child0")));
+		let child1 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child1")));
+		let child2 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child2")));
+		let child3 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child3")));
+		let child4 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child4")));
 
 		child0.borrow_mut().set_parent(&mut root.borrow_mut(), 0);
 		child1.borrow_mut().set_parent(&mut root.borrow_mut(), 0);
@@ -430,109 +424,5 @@ mod tests
 		assert_eq!(child4.borrow().childindex(), 0);
 		assert_eq!(Rc::ptr_eq(&child4.borrow().parent().unwrap(), &root), true);				
 		assert_eq!(root.borrow().children_count(), 5);
-	}
-
-
-	pub trait Widget
-	{	
-		type TreeType;
-		fn tree(&mut self) -> Self::TreeType;
-    	fn paint(&mut self){}
-		fn size(&mut self) {}
-    	fn mouse_move(&mut self) {}
-    	fn destroy(&mut self) {}
-	}
-
-	struct NullContainer;
-
-	impl NullContainer
-	{
-		pub fn new() ->NullContainer
-		{
-			NullContainer{}
-		}
-	}
-
-	struct Container
-	{
-		tree : RcRefCell<TreeNode<RcRefCell<Box<dyn Widget>>>>,
-		id : String,		
-	}
-
-	impl Widget for NullContainer
-	{
-		type TreeType = RcRefCell<TreeNode<RcRefCell<dyn Widget>>>;
-		fn tree(&mut self) -> RcRefCell<TreeNode<RcRefCell<dyn Widget>>>{  }
-    	fn paint(&mut self){}
-	    fn size(&mut self) {}
-    	fn mouse_move(&mut self) {}
-    	fn destroy(&mut self) {}
-	}
-
-	impl Widget for Container
-	{	
-		type TreeType = RcRefCell<TreeNode<RcRefCell<dyn Widget>>>;
-		fn tree(&mut self) -> RcRefCell<TreeNode<RcRefCell<dyn Widget>>>{ self.tree }
-    	fn paint(&mut self){}
-	    fn size(&mut self) {}
-    	fn mouse_move(&mut self) {}
-    	fn destroy(&mut self) {}
-	}
-
-	impl Container
-	{
-		pub fn new(parent : Option<RcRefCell<TreeNode<RcRefCell<dyn Widget>>>>, id : &str) -> RcRefCell<dyn Widget>
-		{
-			let container : RcRefCell<dyn Widget> = Rc::new(RefCell::new(Container
-			{
-				tree : TreeNode::new(parent, 0, Rc::new(RefCell::new(NullContainer::new()))),
-				id : String::from(id), 
-			}));
-
-			container.borrow_mut().tree.borrow_mut().data = Rc::clone(&container);
-			container
-		}
-	}
-
-	#[test]
-	pub fn container_new()
-	{
-		let root = Container::new(None, "root");
-
-		assert_eq!(Rc::ptr_eq(&root.tree.borrow().weak_self.upgrade().unwrap(), &root.tree), true);		
-		assert_eq!(root.tree.borrow().weak_self.strong_count(), 1);
-		assert_eq!(root.tree.borrow().weak_self.weak_count(), 1);
-		assert_eq!(root.tree.borrow().parent.strong_count(), 0);
-		assert_eq!(root.tree.borrow().parent.weak_count(), 0);
-		assert_eq!(root.tree.borrow().children_count(), 0);
-		assert_eq!(root.tree.borrow().childindex(), usize::MAX);
-		assert_eq!(root.id, "root");
-
-		let child0 = Container::new(Some(Rc::clone(&root.tree)), "child0");
-		root.tree.borrow_mut().insert(0, &mut child0.tree.borrow_mut());
-		   //root.borrow_mut().insert(0, &mut child0.borrow_mut());
-
-		assert_eq!(Rc::ptr_eq(&child0.tree.borrow().weak_self.upgrade().unwrap(), &child0.tree), true);
-		assert_eq!(child0.tree.borrow().weak_self.strong_count(), 2);//1.root.children[0]; 2.child0
-		assert_eq!(child0.tree.borrow().weak_self.weak_count(), 1);
-		assert_eq!(child0.tree.borrow().parent.strong_count(), 1);
-		assert_eq!(child0.tree.borrow().parent.weak_count(), 2);//1.root.weak_self; 2.child0.parent;
-		assert_eq!(child0.tree.borrow().children_count(), 0);
-		assert_eq!(child0.tree.borrow().childindex(), 0);
-		assert_eq!(child0.id, "child0");
-		assert_eq!(root.tree.borrow().children_count(), 1);		
-
-		let child1 = Container::new(Some(Rc::clone(&root.tree)), "child1");
-		root.tree.borrow_mut().insert(0, &mut child1.tree.borrow_mut());
-
-		assert_eq!(Rc::ptr_eq(&child1.tree.borrow().weak_self.upgrade().unwrap(), &child1.tree), true);
-		assert_eq!(child1.tree.borrow().weak_self.strong_count(), 2);//1.root.children[0]; 2.child1
-		assert_eq!(child1.tree.borrow().weak_self.weak_count(), 1);
-		assert_eq!(child1.tree.borrow().parent.strong_count(), 1);
-		assert_eq!(child1.tree.borrow().parent.weak_count(), 3);//1.root.weak_self; 2.child0.parent;3.child1.parent
-		assert_eq!(child1.tree.borrow().children_count(), 0);
-		assert_eq!(child1.tree.borrow().childindex(), 0);
-		assert_eq!(child1.id, "child1");
-		assert_eq!(root.tree.borrow().children_count(), 2);						
 	}
 }	
