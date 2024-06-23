@@ -27,6 +27,21 @@ impl Index
 			index,
 		}
 	}
+
+	pub fn arena_id(&self) -> usize
+	{
+		self.index
+	}
+
+	pub fn age(&self) -> usize
+	{
+		self.index
+	}
+
+	pub fn index(&self) -> usize
+	{
+		self.index
+	}
 }
 
 impl PartialEq for Index 
@@ -154,7 +169,7 @@ impl<T> Arena<T>
 
 	pub fn free(&mut self, index : Index) 
 	{
-		if self.check_index(index) == false && self[index].is_some() == false
+		if self.check_index(index) == false && self.get(index).is_some() == false
 		{
 			panic!("Wrong Arena index for freeing !")
 		}
@@ -179,7 +194,7 @@ impl<T> Arena<T>
 
 impl<T> std::ops::Index<Index> for Arena<T> 
 {
-    type Output = Option<T>;
+    type Output = T;
 
     fn index(&self, index : Index) -> &Self::Output 
     {
@@ -188,7 +203,7 @@ impl<T> std::ops::Index<Index> for Arena<T>
     		panic!("Invalid index for Arena !")
     	}
 
-    	&self.heap[index.age][index.index]
+    	&self.heap[index.age][index.index].as_ref().unwrap()
     }
 }
 
@@ -201,7 +216,7 @@ impl<T> std::ops::IndexMut<Index> for Arena<T>
     		panic!("Invalid index for Arena !")
     	}
 
-    	&mut self.heap[index.age][index.index]
+    	self.heap[index.age][index.index].as_mut().unwrap()
     }
 }
 
@@ -290,19 +305,19 @@ mod tests
         assert_eq!(arena.current_age, 0);
         assert_eq!(arena.next_index, 5);
 
-        assert_eq!(arena[index0] , Some(MyStruct::new(0, "All is fine 0")));
+        assert_eq!(arena.get(index0) , Some(&mut MyStruct::new(0, "All is fine 0")));
         assert_eq!(index0.age, 0); assert_eq!(index0.index, 0);
 
-        assert_eq!(arena[index1] , Some(MyStruct::new(1, "All is fine 1")));
+        assert_eq!(arena.get(index1) , Some(&mut MyStruct::new(1, "All is fine 1")));
         assert_eq!(index1.age, 0); assert_eq!(index1.index, 1);
         
-        assert_eq!(arena[index2] , Some(MyStruct::new(2, "All is fine 2")));
+        assert_eq!(arena.get(index2) , Some(&mut MyStruct::new(2, "All is fine 2")));
         assert_eq!(index2.age, 0); assert_eq!(index2.index, 2);
         
-        assert_eq!(arena[index3] , Some(MyStruct::new(3, "All is fine 3")));
+        assert_eq!(arena.get(index3) , Some(&mut MyStruct::new(3, "All is fine 3")));
         assert_eq!(index3.age, 0); assert_eq!(index3.index, 3);
         
-        assert_eq!(arena[index4] , Some(MyStruct::new(4, "All is fine 4")));
+        assert_eq!(arena.get(index4) , Some(&mut MyStruct::new(4, "All is fine 4")));
         assert_eq!(index4.age, 0); assert_eq!(index4.index, 4);
 	}         
 
@@ -407,7 +422,7 @@ mod tests
 		assert_eq!(arena.freed[0], index1);		
 
 		assert_eq!(arena.heap[13][12], Some(MyStruct::new(13*TEST_ARENA_CHUNK_SIZE+12, "All is fine")));
-		assert_eq!(arena[index1], None);
+		assert_eq!(arena.get(index1), None);
 		assert_eq!(arena.heap[13][14], Some(MyStruct::new(13*TEST_ARENA_CHUNK_SIZE+14, "All is fine")));
 
 		let index2 = Index{arena : arena.id(), age : 100, index : 0};
@@ -416,17 +431,17 @@ mod tests
 		assert_eq!(arena.freed[1], index2);		
 
 		assert_eq!(arena.heap[99][TEST_ARENA_CHUNK_SIZE - 1], Some(MyStruct::new(99*TEST_ARENA_CHUNK_SIZE+63, "All is fine")));
-		assert_eq!(arena[index2], None);
+		assert_eq!(arena.get(index2), None);
 
 		//alloc after free
 		let new_index1 = arena.alloc(MyStruct::new(777, "All is fine"));
 		assert_eq!(index2, new_index1);
-		assert_eq!(arena[index2], Some(MyStruct::new(777, "All is fine")));
+		assert_eq!(arena.get(index2), Some(&mut MyStruct::new(777, "All is fine")));
 		assert_eq!(arena.freed.len(), 1);
 
 		let new_index2 = arena.alloc(MyStruct::new(888, "All is fine"));
 		assert_eq!(index1, new_index2);
-		assert_eq!(arena[index1], Some(MyStruct::new(888, "All is fine")));		
+		assert_eq!(arena.get(index1), Some(&mut MyStruct::new(888, "All is fine")));		
 		assert_eq!(arena.freed.len(), 0);
     }         
 }//mod tests
