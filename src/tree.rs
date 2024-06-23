@@ -46,12 +46,51 @@ impl TreeNode
 		{
 			let mut arena = get_tree_arena().lock().unwrap();
 			index = arena.alloc(node);
-			arena.get_by_index(index).unwrap().index = index;
+			arena.get(index).unwrap().index = index;
 		}		
 
 		index
 	}
 
+	pub fn index(&self) -> Index
+	{
+		self.index
+	}
+
+	pub fn parent(&self) -> Option<Index>
+	{
+		self.parent
+	}
+
+	pub fn child(&self, index : usize) -> Option<&Index>
+	{
+		self.children.get(index)
+	}
+
+	pub fn childindex(&self) -> usize
+	{
+		self.childindex
+	}
+
+	pub fn children_count(&self) -> usize
+	{
+		self.children.len()
+	}	
+
+	pub fn data<T: 'static>(&self) -> Option<&T>
+	{
+		self.data.downcast_ref::<T>()
+	}	
+
+}
+
+impl Drop for TreeNode
+{
+	fn drop(&mut self)
+	{
+		let mut arena = get_tree_arena().lock().unwrap();
+		arena.free(self.index);
+	}
 }
 
 #[cfg(test)]
@@ -92,12 +131,21 @@ mod tests
     	let id = arena.id();    
     	 	
     	assert_eq!(arena.used(), 4);
-    	assert_eq!(arena.get(0, 1).unwrap().index, Index::new(id,0,1));
-    	
-    	arena.free(w1);
-    	arena.free(w2);
-    	arena.free(w3);
-    	arena.free(root);
+    	assert_eq!(arena.get(root).unwrap().index(), Index::new(id,0,0));
+    	assert_eq!(arena.get_mut(0, 0).unwrap().index(), Index::new(id,0,0));
+    	assert_eq!(arena.get(root).unwrap().parent(), None);
+
+    	assert_eq!(arena.get(w1).unwrap().index(), Index::new(id,0,1));
+    	assert_eq!(arena.get_mut(0, 1).unwrap().index(), Index::new(id,0,1));
+    	assert_eq!(arena.get(w1).unwrap().parent(), Some(root));
+
+    	assert_eq!(arena.get(w2).unwrap().index(), Index::new(id,0,2));
+    	assert_eq!(arena.get_mut(0, 2).unwrap().index(), Index::new(id,0,2));
+    	assert_eq!(arena.get(w2).unwrap().parent(), Some(root));
+
+    	assert_eq!(arena.get(w3).unwrap().index(), Index::new(id,0,3));
+    	assert_eq!(arena.get_mut(0, 3).unwrap().index(), Index::new(id,0,3));
+    	assert_eq!(arena.get(w3).unwrap().parent(), Some(root));
     }
 
 }//mod tests

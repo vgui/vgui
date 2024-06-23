@@ -154,7 +154,6 @@ impl TreeNode
 	}	
 }
 
-
 pub trait Tree<T>
 {	
     fn remove(&mut self, childindex : usize) -> RcRefCell<TreeNode>;

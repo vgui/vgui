@@ -161,17 +161,20 @@ impl<T> Arena<T>
 
 		self.heap[index.age][index.index].take().unwrap();
 		self.freed.push(index);
+
+		println!("Free index {},{}", index.age, index.index);
 	}	
 
-	pub fn get(&mut self, age : usize, index : usize) -> Option<&mut T>
+	pub fn get(&mut self, index : Index) -> Option<&mut T>
+	{
+		self.heap[index.age][index.index].as_mut()
+	}	
+
+	pub fn get_mut(&mut self, age : usize, index : usize) -> Option<&mut T>
 	{
 		self.heap[age][index].as_mut()
 	}
 
-	pub fn get_by_index(&mut self, index : Index) -> Option<&mut T>
-	{
-		self.heap[index.age][index.index].as_mut()
-	}	
 }
 
 impl<T> std::ops::Index<Index> for Arena<T> 
