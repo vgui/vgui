@@ -66,10 +66,10 @@ impl TreeNode
 		index
 	}
 
-	pub fn free(&self)
+	pub fn free(index : Index)
 	{
 		//get_tree_arena().lock().unwrap().free(self.index());
-		ARENA.with_borrow_mut(|arena| arena.free(self.index()))
+		ARENA.with_borrow_mut(|arena| arena.free(index))
 	}
 
 	pub fn index(&self) -> Index
@@ -168,15 +168,12 @@ mod tests
 	    	assert_eq!(arena[w3].index(), Index::new(id,0,3));
     		assert_eq!(arena[w3].index(), Index::new(id,0,3));
     		assert_eq!(arena[w3].parent(), Some(root));
-
-	    	arena.free(root);
-	    	arena.free(w1);
-	    	arena.free(w2);
-	    	arena.free(w3);
-    		// arena[w1].free();
-    		// arena[w2].free();
-    		// arena[w3].free();
     	});
+
+    	TreeNode::free(root);
+    	TreeNode::free(w1);
+    	TreeNode::free(w2);
+    	TreeNode::free(w3);
     }
 
 }//mod tests
