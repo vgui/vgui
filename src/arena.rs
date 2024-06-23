@@ -56,7 +56,7 @@ impl<T> Arena<T>
 			let mut lock = ARENAS.lock().unwrap();
 			*lock += 1;
 			arenas = *lock;
-		}
+		}		
 
 		let mut heap = Vec::new();
 		heap.push(Vec::new());
@@ -202,17 +202,6 @@ impl<T> std::ops::IndexMut<Index> for Arena<T>
     }
 }
 
-pub trait ArenaTrait
-{
-	fn alloc<T>(&mut self, obj: T) -> Index;
-
-	fn free(&mut self, index : Index);
-}
-
-// impl ArenaTrait for 
-// {
-// 	// add code here
-// }
 
 #[cfg(test)]
 mod tests 

@@ -31,7 +31,7 @@ impl TreeNode
 {	
 	pub fn new(parent : Option<Index>,childindex : usize , data : Box<dyn Any + Send + Sync>) -> Index
 	{
-		let arena = get_tree_arena();
+		//let arena = get_tree_arena();
 
 		let node = TreeNode 
 		{
@@ -44,7 +44,7 @@ impl TreeNode
 
 		let index;
 		{
-			let mut arena = arena.lock().unwrap();
+			let mut arena = get_tree_arena().lock().unwrap();
 			index = arena.alloc(node);
 			arena.get_by_index(index).unwrap().index = index;
 		}		
@@ -83,14 +83,21 @@ mod tests
     #[test]
     fn tree_new()
     {
-    	let root = TreeNode::new(None, usize::MAX, WidgetObj::new("w1"));
-    	let w1 = TreeNode::new(Some(root), usize::MAX, WidgetObj::new("w2"));
-    	let w2 = TreeNode::new(Some(root), usize::MAX, WidgetObj::new("w3"));
-    	let w2 = TreeNode::new(Some(root), usize::MAX, WidgetObj::new("w4"));
+    	let root = TreeNode::new(None, usize::MAX, WidgetObj::new("root"));    	
+    	let w1 = TreeNode::new(Some(root), usize::MAX, WidgetObj::new("w1"));
+    	let w2 = TreeNode::new(Some(root), usize::MAX, WidgetObj::new("w2"));
+    	let w3 = TreeNode::new(Some(root), usize::MAX, WidgetObj::new("w3"));
 
-    	// let arena = get_tree_arena().lock().unwrap();
-    	// assert_eq!(arena.used(), 4);
-    	// assert_eq!(arena.get(0, 1).unwrap(), Index::new(arena.id(),0,0));
+    	let mut arena = get_tree_arena().lock().unwrap();    	
+    	let id = arena.id();    
+    	 	
+    	assert_eq!(arena.used(), 4);
+    	assert_eq!(arena.get(0, 1).unwrap().index, Index::new(id,0,1));
+    	
+    	arena.free(w1);
+    	arena.free(w2);
+    	arena.free(w3);
+    	arena.free(root);
     }
 
 }//mod tests
