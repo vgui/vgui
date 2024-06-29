@@ -26,8 +26,9 @@ pub trait Tree
 }
 
 
-pub struct TreeNode
+pub struct TreeNode<'a>
 {
+	arena : &'a Arena<TreeNode<'a>>,
 	index : Index,
 	parent : Option<Index>,
 	children : Vec<Index>,
@@ -37,16 +38,9 @@ pub struct TreeNode
 
 impl TreeNode
 {	
-	fn get_arena() -> &'static Mutex<Arena<TreeNode>>
-	{		
-		static ARENA : Mutex<Arena<TreeNode>> = Mutex::new(Arena::new());
-
-	    if ARENA.lock().unwrap().initialized() == false
-	    {
-	    	ARENA.lock().unwrap().init(TREE_ARENA_CHUNK_SIZE);
-	    }
-
-    	&ARENA
+	fn arena(&self) -> &'a Arena<TreeNode<'a>>
+	{
+		self.arena
 	}
 
 	pub fn new(parent : Option<Index>,childindex : usize , data : Box<dyn Any + Send + Sync>) -> Index
@@ -60,12 +54,7 @@ impl TreeNode
 			data,
 		};
 
-		let index;
-		{
-			let mut arena = TreeNode::get_arena().lock().unwrap();
-			index = arena.alloc(node);
-			arena[index].index = index;	
-		}	
+		let index = selfarena.alloc(node);
 
 		if parent.is_some()
 		{			
@@ -260,18 +249,54 @@ mod tests
     		};    		
 
     		{
-	    		let mut lock = builder.tree_arena.write().unwrap();
-    			lock.init(TREE_ARENA_CHUNK_SIZE);
+    			let mut arena = builder.tree_arena.write().unwrap();
+    			arena.init(TREE_ARENA_CHUNK_SIZE);    		
     		}
 
     		builder
     	}
 
-    	/*
-    	pub new_tree_node() -> Index
+    	
+    	pub fn new_tree_node(&self, parent : Option<Index>,childindex : usize , data : Box<dyn Any + Send + Sync>) -> Index
     	{
+    		let mut arena = self.tree_arena.write().unwrap();
 
-    	}*/
+			let node = TreeNode 
+			{
+				index : Index::new(0,0,0),
+				parent : None,
+				children : Vec::new(),
+				childindex : usize::MAX,
+				data,
+			};
+
+			let index;
+			{
+				//let mut arena = TreeNode::get_arena().lock().unwrap();
+				index = arena.alloc(node);
+				arena[index].index = index;	
+			}	
+
+			if parent.is_some()
+			{			
+				let parent = parent.unwrap();
+				let mut childindex = childindex;
+
+				if childindex == usize::MAX
+				{
+					childindex = arena[parent].children_count();	
+				}
+
+				//let mut arena = TreeNode::get_arena().lock().unwrap();
+				arena[index].parent = Some(parent);
+				arena[parent].children.insert(childindex, index);//Insert if parent exist
+				arena[parent].update_indexes(childindex);
+				//println!("parent = {}, {}, {}", parent.unwrap().arena_id(), parent.unwrap().age(), parent.unwrap().index());
+				//println!("childindex = {}, {}", childindex,arena.id());
+    		}
+
+    		index
+    	}
     }
 
 	struct WidgetObj
@@ -292,6 +317,26 @@ mod tests
 	    fn paint(&mut self){}
     	fn size(&mut self) {}
 	}
+
+   #[test]
+    fn tree_builder()
+    {
+    	let builder = Builder::new();
+    	let root = builder.new_tree_node(None, usize::MAX, WidgetObj::new("root")); 
+    	let child0 = builder.new_tree_node(Some(root), usize::MAX, WidgetObj::new("child0"));
+    	let child1 = builder.new_tree_node(Some(root), usize::MAX, WidgetObj::new("child1"));
+    	let child2 = builder.new_tree_node(Some(root), usize::MAX, WidgetObj::new("child2"));
+    	let child3 = builder.new_tree_node(Some(root), usize::MAX, WidgetObj::new("child3"));
+    	let child4 = builder.new_tree_node(Some(root), usize::MAX, WidgetObj::new("child4"));
+ 
+		assert_eq!(child0.childindex(), 0);
+		assert_eq!(child1.childindex(), 1);
+		assert_eq!(child2.childindex(), 2);
+		assert_eq!(child3.childindex(), 3);
+		assert_eq!(child4.childindex(), 4);
+		assert_eq!(root.children_count(), 5);
+
+ 	}
 
  /*   #[test]
     fn tree_new_free()
@@ -329,7 +374,7 @@ mod tests
     	TreeNode::free(w1);
     	TreeNode::free(w2);
     	TreeNode::free(w3);
-    }*/
+    }
 
 #[test]
 	pub fn tree_remove()
@@ -379,7 +424,7 @@ mod tests
 		assert_eq!(root.children_count(), 0);	
 	}
 
-/*
+
 	#[test]
 	pub fn tree_insert()
 	{
