@@ -42,6 +42,22 @@ impl Index
 	{
 		self.index
 	}
+
+	pub fn set_age(&mut self, age : usize)
+	{
+		self.age = age
+	}
+
+	pub fn set_index(&mut self, index : usize)
+	{
+		self.index = index
+	}
+
+	pub fn set(&mut self, age : usize, index : usize)
+	{
+		self.age = age;
+		self.index = index
+	}	
 }
 
 impl PartialEq for Index 
@@ -54,6 +70,7 @@ impl PartialEq for Index
 
 pub struct Arena<T>
 {
+	initialized : bool,//For static instances, see Arena::new below
 	id : usize,//Arena identifier from ARENAS
 	chunk_size : usize,
 	heap : Vec<Vec<Option<T>>>,
@@ -64,29 +81,46 @@ pub struct Arena<T>
 
 impl<T> Arena<T> 
 {	
-	pub fn new(chunk_size : usize) -> Self 
-	{		
-		let arenas : usize;		
+	//For static instances of Arena we need const construcor. Use Arena::init for initialization.
+    pub const fn new() -> Self 
+    { 
+    	Self 
 		{
-			let mut lock = ARENAS.lock().unwrap();
-			*lock += 1;
-			arenas = *lock;
-		}		
-
-		let mut heap = Vec::new();
-		heap.push(Vec::new());
-
-		let arena = Self 
-		{
-			id : arenas,
-			chunk_size,
-			heap,
+			initialized : false,
+			id : 0,
+			chunk_size : 0,
+			heap : Vec::new(),
 			freed : Vec::new(),
 			current_age : 0,
 			next_index : 0,			
-		};	
+		}
+    }
 
-		arena		
+	pub fn init(&mut self, chunk_size : usize) -> &mut Self 
+	{	
+		if self.initialized == false
+		{	
+			let arena_id : usize;		
+			{
+				let mut lock = ARENAS.lock().unwrap();
+				*lock += 1;
+				arena_id = *lock;
+			}		
+
+			self.id = arena_id;
+			self.chunk_size = chunk_size;
+			self.heap.push(Vec::new());//Initialized in Arena::new
+			//self.freed;//Initialized in Arena::new
+			self.current_age = 0;
+			self.next_index = 0;
+		}
+
+		self		
+	}
+
+	pub fn initialized(&self) -> bool
+	{
+		self.initialized
 	}
 
 	pub fn id(&self) -> usize
@@ -266,7 +300,8 @@ mod tests
     #[test]
     fn arena_new() 
     {
-        let arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
+        let mut arena = Arena::<MyStruct>::new();
+        arena.init(TEST_ARENA_CHUNK_SIZE);
 
         assert_eq!(arena.heap.len(), 1);
         assert_eq!(arena.freed.len(), 0);
@@ -277,7 +312,8 @@ mod tests
    #[test]
     fn arena_alloc() 
     {
-        let mut arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
+        let mut arena = Arena::<MyStruct>::new();
+        arena.init(TEST_ARENA_CHUNK_SIZE);
         let index = arena.alloc(MyStruct::new(16838, "All is fine"));
 
         assert_eq!(arena.heap.len(), 1);
@@ -292,7 +328,8 @@ mod tests
     #[test]
     fn arena_alloc5() 
     {
-        let mut arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
+        let mut arena = Arena::<MyStruct>::new();
+        arena.init(TEST_ARENA_CHUNK_SIZE);
         let index0 = arena.alloc(MyStruct::new(0, "All is fine 0"));
         let index1 = arena.alloc(MyStruct::new(1, "All is fine 1"));
         let index2 = arena.alloc(MyStruct::new(2, "All is fine 2"));
@@ -325,7 +362,8 @@ mod tests
 	//For more test accuracy need MyStruct::new(i,"All is fine")
 	fn arena_alloc_n(n : usize) -> (Arena<MyStruct>, Vec<Index>)
 	{
-        let mut arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
+        let mut arena = Arena::<MyStruct>::new();
+        arena.init(TEST_ARENA_CHUNK_SIZE);
         let mut indexs = Vec::new();
 
         for i in 0..n

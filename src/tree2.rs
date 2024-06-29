@@ -87,6 +87,7 @@ impl TreeNode
         child.weak_self.upgrade().unwrap()
     }
 
+    //////////ERROR!!!!!!!!!!
     pub fn insert(&mut self,  childindex : usize, child : &mut Self)
     {
     	//Check child index.
@@ -106,7 +107,7 @@ impl TreeNode
         if let Some(parent) = child.parent()
         {
 	       	//parent.borrow_mut().remove(child.childindex);
-			self.remove(child);
+			self.remove(child);//////////ERROR!!!!!!!!!!
         }
 
         //Set parent for child.
