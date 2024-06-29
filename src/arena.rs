@@ -3,15 +3,13 @@
 #![allow(unused_imports)]
 
 use std::vec::Vec;
-use std::sync::RwLock;
-
-static ARENAS : RwLock<usize> = RwLock::new(0);
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 
 #[derive(Copy, Clone, Debug)]
 pub struct Index 
 {
-	arena : usize,//Arena identifier from ARENAS
+	arena : usize,//Arena identifier from ARENA_ID
 	age : usize,
 	index : usize,
 }
@@ -72,7 +70,7 @@ impl PartialEq for Index
 pub struct Arena<T>
 {
 	initialized : bool,//For static instances, see Arena::new below
-	id : usize,//Arena identifier from ARENAS
+	id : usize,//Arena identifier from ARENA_ID
 	chunk_size : usize,
 	heap : Vec<Vec<Option<T>>>,
 	freed : Vec<Index>,
@@ -99,17 +97,19 @@ impl<T> Arena<T>
 
 	pub fn init(&mut self, chunk_size : usize) -> &mut Self 
 	{	
+		static ARENA_ID : AtomicUsize = AtomicUsize::new(0);
+
 		if self.initialized == false
 		{	
-			let mut arena_id = ARENAS.write().unwrap();
-			*arena_id += 1;
-
-			self.id = *arena_id;
+			self.id = ARENA_ID.load(Ordering::SeqCst);
+			ARENA_ID.fetch_add(1, Ordering::SeqCst);
+			
 			self.chunk_size = chunk_size;
 			self.heap.push(Vec::new());//Initialized in Arena::new
 			//self.freed;//Initialized in Arena::new
 			self.current_age = 0;
 			self.next_index = 0;
+			self.initialized = true;
 		}
 
 		self		
@@ -172,8 +172,12 @@ impl<T> Arena<T>
 		if self.freed.len() == 0  
 		{
 			self.heap[self.current_age].push(Some(obj));
+
+			assert_eq!(self.heap[self.current_age].len()-1, self.next_index);
+			
 			let index = Index::new(self.id(), self.current_age, self.next_index);
 			self.next_index += 1;					
+			
 			index
 		}
 		else 
@@ -207,8 +211,6 @@ impl<T> Arena<T>
 
 		self.heap[index.age][index.index].take().unwrap();
 		self.freed.push(index);
-
-		println!("Free index {},{}", index.age, index.index);
 	}	
 
 	pub fn get(&mut self, index : Index) -> Option<&mut T>

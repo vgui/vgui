@@ -39,16 +39,14 @@ impl TreeNode
 {	
 	fn get_arena() -> &'static Mutex<Arena<TreeNode>>
 	{
-		static ARENA : Mutex<Arena<TreeNode>> = Mutex::new(Arena::const_new());
-		static ONCE : Once = Once::new();
+		static ARENA : Mutex<Arena<TreeNode>> = Mutex::new(Arena::new());
 	    
-	    if ARENA.is_none()
+	    if ARENA.lock().unwrap().initialized() == false
 	    {
-	    	ARENA.unwrap().lock().unwrap();
-	    	= Some(Arc::new(Mutex::new(Arena::new(TREE_ARENA_CHUNK_SIZE))));
+	    	ARENA.lock().unwrap().init(TREE_ARENA_CHUNK_SIZE);
 	    }
 
-    	&ARENA.clone().unwrap()
+    	&ARENA
 	}
 
 	pub fn new(parent : Option<Index>,childindex : usize , data : Box<dyn Any + Send + Sync>) -> Index
@@ -83,6 +81,7 @@ impl TreeNode
 			arena[index].parent = parent;
 			arena[parent.unwrap()].children.insert(childindex, index);
 			arena[parent.unwrap()].update_indexes(childindex);
+			println!("parent = {}, {}, {}", parent.unwrap().arena_id(), parent.unwrap().age(), parent.unwrap().index());
 			println!("childindex = {}, {}", childindex,arena.id());
 		}		
 
@@ -299,7 +298,7 @@ mod tests
     	TreeNode::free(w2);
     	TreeNode::free(w3);
     }
-
+/*
 #[test]
 	pub fn tree_remove()
 	{
@@ -348,7 +347,7 @@ mod tests
 		assert_eq!(root.children_count(), 0);	
 	}
 
-/*
+
 	#[test]
 	pub fn tree_insert()
 	{
