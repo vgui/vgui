@@ -5,7 +5,7 @@
 use std::vec::Vec;
 use std::any::Any;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex, Once};
+use std::sync::{Arc, Mutex, Once, RwLock};
 use std::{mem::MaybeUninit, thread};
 use crate::arena::{Index, Arena};
 
@@ -38,9 +38,9 @@ pub struct TreeNode
 impl TreeNode
 {	
 	fn get_arena() -> &'static Mutex<Arena<TreeNode>>
-	{
+	{		
 		static ARENA : Mutex<Arena<TreeNode>> = Mutex::new(Arena::new());
-	    
+
 	    if ARENA.lock().unwrap().initialized() == false
 	    {
 	    	ARENA.lock().unwrap().init(TREE_ARENA_CHUNK_SIZE);
@@ -64,8 +64,7 @@ impl TreeNode
 		{
 			let mut arena = TreeNode::get_arena().lock().unwrap();
 			index = arena.alloc(node);
-			arena[index].index = index;
-			println!("Arena = {}", index.arena_id());
+			arena[index].index = index;	
 		}	
 
 		if parent.is_some()
@@ -81,9 +80,10 @@ impl TreeNode
 			arena[index].parent = parent;
 			arena[parent.unwrap()].children.insert(childindex, index);
 			arena[parent.unwrap()].update_indexes(childindex);
-			println!("parent = {}, {}, {}", parent.unwrap().arena_id(), parent.unwrap().age(), parent.unwrap().index());
-			println!("childindex = {}, {}", childindex,arena.id());
+			//println!("parent = {}, {}, {}", parent.unwrap().arena_id(), parent.unwrap().age(), parent.unwrap().index());
+			//println!("childindex = {}, {}", childindex,arena.id());
 		}		
+	
 
 		index
 	}
@@ -100,12 +100,14 @@ impl TreeNode
 
     fn update_indexes(&mut self, start_index : usize)
     {
-    	let mut index : usize = start_index;
+    	let mut i : usize = start_index;
 
-        while index < self.children.len()
+        while i < self.children.len()
         {
-            self.children[index].set_index(index);
-            index += 1
+        	let index = self.children[i];        	
+        	TreeNode::get_arena().lock().unwrap()[index].childindex = i;
+            
+            i += 1
         }
     }
 }
@@ -243,6 +245,35 @@ mod tests
     use crate::arena::{Index, Arena};
     use crate::tree::{TreeNode};
 
+    struct Builder
+    {
+    	tree_arena : RwLock<Arena<TreeNode>>,
+    }
+
+    impl Builder
+    {
+    	pub fn new() -> Self
+    	{
+    		let builder = Self
+    		{
+    			tree_arena : RwLock::new(Arena::new()),
+    		};    		
+
+    		{
+	    		let mut lock = builder.tree_arena.write().unwrap();
+    			lock.init(TREE_ARENA_CHUNK_SIZE);
+    		}
+
+    		builder
+    	}
+
+    	/*
+    	pub new_tree_node() -> Index
+    	{
+
+    	}*/
+    }
+
 	struct WidgetObj
 	{
 		id : String,
@@ -262,7 +293,7 @@ mod tests
     	fn size(&mut self) {}
 	}
 
-    #[test]
+ /*   #[test]
     fn tree_new_free()
     {
     	let root = TreeNode::new(None, usize::MAX, WidgetObj::new("root"));    	
@@ -271,7 +302,8 @@ mod tests
     	let w3 = TreeNode::new(Some(root), usize::MAX, WidgetObj::new("w3"));
     	
     	let arena_id = TreeNode::arena_id();    	
-   		
+   		println!("root = {}, {}, {}", root.arena_id(), root.age(), root.index());
+
    		assert_eq!(root.arena_id(), arena_id);
    		assert_eq!(w1.arena_id(), arena_id);
    		assert_eq!(w2.arena_id(), arena_id);
@@ -297,8 +329,8 @@ mod tests
     	TreeNode::free(w1);
     	TreeNode::free(w2);
     	TreeNode::free(w3);
-    }
-/*
+    }*/
+
 #[test]
 	pub fn tree_remove()
 	{
@@ -347,33 +379,28 @@ mod tests
 		assert_eq!(root.children_count(), 0);	
 	}
 
-
+/*
 	#[test]
 	pub fn tree_insert()
 	{
-		let root = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("root")));
+		let mut root = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("root")));
 		let child0 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child0")));
 		let child1 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child1")));
 		let child2 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child2")));
 		let child3 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child3")));
 		let child4 = TreeNode::new(None, usize::MAX, Box::new(WidgetObj::new("child4")));
 
-		root.insert(0, &mut child4);
-		root.insert(0, &mut child3);
-		root.insert(0, &mut child2);
-		root.insert(0, &mut child1);
-		root.insert(0, &mut child0);
+		root.insert(0, child4);
+		root.insert(0, child3);
+		root.insert(0, child2);
+		root.insert(0, child1);
+		root.insert(0, child0);
 
 		assert_eq!(child0.childindex(), 0);
-		assert_eq!(Rc::ptr_eq(&child0.parent().unwrap(), &root), true);				
 		assert_eq!(child1.childindex(), 1);
-		assert_eq!(Rc::ptr_eq(&child1.parent().unwrap(), &root), true);				
 		assert_eq!(child2.childindex(), 2);
-		assert_eq!(Rc::ptr_eq(&child2.parent().unwrap(), &root), true);				
 		assert_eq!(child3.childindex(), 3);
-		assert_eq!(Rc::ptr_eq(&child3.parent().unwrap(), &root), true);				
 		assert_eq!(child4.childindex(), 4);
-		assert_eq!(Rc::ptr_eq(&child4.parent().unwrap(), &root), true);				
 		assert_eq!(root.children_count(), 5);
 	}*/
 }//mod tests

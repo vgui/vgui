@@ -29,12 +29,12 @@ impl Index
 	//Arena ID must be unchangable.
 	pub fn arena_id(&self) -> usize
 	{
-		self.index
+		self.arena
 	}
 
 	pub fn age(&self) -> usize
 	{
-		self.index
+		self.age
 	}
 
 	pub fn index(&self) -> usize
@@ -97,7 +97,7 @@ impl<T> Arena<T>
 
 	pub fn init(&mut self, chunk_size : usize) -> &mut Self 
 	{	
-		static ARENA_ID : AtomicUsize = AtomicUsize::new(0);
+		static ARENA_ID : AtomicUsize = AtomicUsize::new(1);
 
 		if self.initialized == false
 		{	
