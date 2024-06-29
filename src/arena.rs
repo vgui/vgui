@@ -3,9 +3,9 @@
 #![allow(unused_imports)]
 
 use std::vec::Vec;
-use std::sync::Mutex;
+use std::sync::RwLock;
 
-static ARENAS : Mutex<usize> = Mutex::new(0);
+static ARENAS : RwLock<usize> = RwLock::new(0);
 
 
 #[derive(Copy, Clone, Debug)]
@@ -28,6 +28,7 @@ impl Index
 		}
 	}
 
+	//Arena ID must be unchangable.
 	pub fn arena_id(&self) -> usize
 	{
 		self.index
@@ -100,14 +101,10 @@ impl<T> Arena<T>
 	{	
 		if self.initialized == false
 		{	
-			let arena_id : usize;		
-			{
-				let mut lock = ARENAS.lock().unwrap();
-				*lock += 1;
-				arena_id = *lock;
-			}		
+			let mut arena_id = ARENAS.write().unwrap();
+			*arena_id += 1;
 
-			self.id = arena_id;
+			self.id = *arena_id;
 			self.chunk_size = chunk_size;
 			self.heap.push(Vec::new());//Initialized in Arena::new
 			//self.freed;//Initialized in Arena::new
