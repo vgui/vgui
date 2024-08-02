@@ -4,7 +4,9 @@
 
 use std::vec::Vec;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock, Mutex};
+
+
+static ARENA_ID : AtomicUsize = AtomicUsize::new(0);
 
 
 #[derive(Copy, Clone, Debug)]
@@ -70,7 +72,6 @@ impl PartialEq for Index
 
 pub struct Arena<T>
 {
-	lock : RwLock<usize>,//Intrusive Lock for avoid using Lock outside Arena. One Lock for all users of Arena instance.
 	id : usize,//Arena identifier from ARENA_ID
 	chunk_size : usize,
 	heap : Vec<Vec<Option<T>>>,
@@ -82,12 +83,9 @@ pub struct Arena<T>
 impl<T> Arena<T> 
 {	
 	pub fn new(chunk_size : usize) -> Self 
-	{	
-		static ARENA_ID : AtomicUsize = AtomicUsize::new(1);
-
-    	let mut node = Self 
+	{			
+    	let mut arena = Self 
 		{
-			lock : RwLock::new(0),
 			id : ARENA_ID.load(Ordering::SeqCst),
 			chunk_size,
 			heap : Vec::new(),
@@ -96,32 +94,29 @@ impl<T> Arena<T>
 			next_index : 0,			
 		};
 
-		node.heap.push(Vec::new());		
+		arena.heap.push(Vec::new());
+		ARENA_ID.fetch_add(1, Ordering::SeqCst);	
 
-		node		
+		arena		
 	}
 
 	pub fn id(&self) -> usize
 	{
-		let lock = self.lock.read().unwrap();
 		self.id
 	}
 
 	pub fn chunk_size(&self) -> usize
 	{
-		let lock = self.lock.read().unwrap();
 		self.chunk_size
 	}
 
 	pub fn ages(&self) -> usize
 	{
-		let lock = self.lock.read().unwrap();
 		self.heap.len()
 	}
 
 	pub fn used(&self) -> usize
 	{
-		let lock = self.lock.read().unwrap();
 		let mut used : usize = 0;
 		
 		for chunk in &self.heap
@@ -140,15 +135,11 @@ impl<T> Arena<T>
 
 	pub fn freed(&self) -> usize
 	{
-		let lock = self.lock.read().unwrap();
 		self.freed.len()
 	}
 
 	pub fn alloc(&mut self, obj : T) -> Index
 	{
-		let mut lock = self.lock.write().unwrap();
-		*lock += 1;//To avoid optimizations
-
 		//Chunk is full, need to alloc new chunk.
 		if self.next_index == self.chunk_size 
 		{
@@ -192,9 +183,7 @@ impl<T> Arena<T>
 
 	pub fn free(&mut self, index : Index) 
 	{
-		let lock = self.lock.write().unwrap();
-
-		if self.check_index(index) == false && self.get(index).is_some() == false
+		if self.check_index(index) == false && self.get(index).is_some() == true
 		{
 			panic!("Wrong Arena index for freeing !")
 		}
@@ -291,7 +280,10 @@ mod tests
     {
         let arena = Arena::<MyStruct>::new(TEST_ARENA_CHUNK_SIZE);
 
+        assert!(arena.id < ARENA_ID.load(Ordering::SeqCst));
+        assert_eq!(arena.chunk_size, TEST_ARENA_CHUNK_SIZE);
         assert_eq!(arena.heap.len(), 1);
+        assert_eq!(arena.heap[0].len(), 0);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 0);
         assert_eq!(arena.next_index, 0);        

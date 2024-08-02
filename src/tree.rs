@@ -5,30 +5,39 @@
 use std::vec::Vec;
 use std::any::Any;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex, Once, RwLock};
-use std::{mem::MaybeUninit, thread};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::cell::{Cell, RefCell};
 use crate::arena::{Index, Arena};
+use std::cell::LazyCell;
+use std::sync::LazyLock;
 
 
 const TREE_ARENA_CHUNK_SIZE : usize = 64;
+
+static ARENA : LazyLock<Mutex<Arena<TreeNode>>> = LazyLock::new
+(	
+	||
+	{
+		Mutex::new(Arena::<TreeNode>::new(TREE_ARENA_CHUNK_SIZE))	
+	}
+);
 
 
 pub trait Tree
 {	
 	fn index(&self) -> Index;
-    fn remove(&mut self, childindex : Index) -> Index;
+    fn remove(&mut self, childindex : usize) -> Index;
     fn insert(&mut self,  childindex : usize, child : Index);
 	fn parent(&self) -> Option<Index>;
 	fn child(&self, index : usize) -> Index;
 	fn childindex(&self) -> usize;
 	fn children_count(&self) -> usize;
-	//fn data<T>(&self) -> Option<&T>;
+	//fn data(&self) -> Option<&T>;
 }
 
 
-pub struct TreeNode<'a>
+pub struct TreeNode
 {
-	arena : &'a Arena<TreeNode<'a>>,
 	index : Index,
 	parent : Option<Index>,
 	children : Vec<Index>,
@@ -38,12 +47,7 @@ pub struct TreeNode<'a>
 
 impl TreeNode
 {	
-	fn arena(&self) -> &'a Arena<TreeNode<'a>>
-	{
-		self.arena
-	}
-
-	pub fn new(parent : Option<Index>,childindex : usize , data : Box<dyn Any + Send + Sync>) -> Index
+	pub fn new(parent : Option<Index>, childindex : usize , data : Box<dyn Any + Send + Sync>) -> Index
 	{
 		let node = TreeNode 
 		{
@@ -54,7 +58,9 @@ impl TreeNode
 			data,
 		};
 
-		let index = selfarena.alloc(node);
+		let mut arena = ARENA.lock().unwrap();
+		let index = arena.alloc(node);
+		arena[index].index = index;
 
 		if parent.is_some()
 		{			
@@ -65,26 +71,12 @@ impl TreeNode
 				childindex = parent.unwrap().children_count();	
 			}
 
-			let mut arena = TreeNode::get_arena().lock().unwrap();
 			arena[index].parent = parent;
 			arena[parent.unwrap()].children.insert(childindex, index);
 			arena[parent.unwrap()].update_indexes(childindex);
-			//println!("parent = {}, {}, {}", parent.unwrap().arena_id(), parent.unwrap().age(), parent.unwrap().index());
-			//println!("childindex = {}, {}", childindex,arena.id());
 		}		
 	
-
 		index
-	}
-
-	pub fn free(index : Index)
-	{
-		TreeNode::get_arena().lock().unwrap().free(index);
-	}
-
-    pub fn arena_id() -> usize
-	{
-		TreeNode::get_arena().lock().unwrap().id()
 	}
 
     fn update_indexes(&mut self, start_index : usize)
@@ -93,45 +85,31 @@ impl TreeNode
 
         while i < self.children.len()
         {
-        	let index = self.children[i];        	
-        	TreeNode::get_arena().lock().unwrap()[index].childindex = i;
-            
+        	let mut arena = ARENA.lock().unwrap();
+        	let index = self.children[i];     
+        	arena[index].childindex = i;            
             i += 1
         }
     }
-}
 
-impl Drop for TreeNode
-{
-	fn drop(&mut self)
-	{
-		println!("Tree node dropped {},{}", self.index.age(), self.index.index());
-	}
-}
-
-impl Tree for TreeNode
-{	
-    fn remove(&mut self, child : Index) -> Index
+    fn remove(&mut self, childindex : usize) -> Index
     {
     	//Check child index.
-    	let child = &mut TreeNode::get_arena().lock().unwrap()[child];
-		let childindex = child.childindex;
-
         if childindex >= self.children.len()
         {
-            panic!("Too big index for removing.");
+            panic!("Too big child index for removing.");
         }
-      
-		child.parent = None;
-       	child.childindex = usize::MAX;
-
-		self.children.remove(childindex);
+          	
+		let index = self.children.remove(childindex);
         self.update_indexes(childindex);
 
-        child.index()
+        let mut arena = ARENA.lock().unwrap();
+        arena.free(index);
+
+        index
     }
 
-    fn insert(&mut self,  childindex : usize, child : Index)
+    fn insert(&mut self,  childindex : usize, child : TreeNode)
     {
     	//Check child index.
 		let mut childindex = childindex;
@@ -143,13 +121,15 @@ impl Tree for TreeNode
 
         if childindex > self.children.len()
         {
-            panic!("Too big index for inserting.");
+            panic!("Too big child index for inserting.");
         }
 
-        let child = &mut TreeNode::get_arena().lock().unwrap()[child];
+		let mut arena = ARENA.lock().unwrap();        
+        let index = arena.alloc(child);
 
         //If child have parent, remove child from parent using child index.
-        if let Some(mut parent) = child.parent()
+        if let Some(parent) = child.parent()
+        	&& arena.check_index
         {
 			parent.remove(child.index());
         }
@@ -163,12 +143,12 @@ impl Tree for TreeNode
         self.update_indexes(childindex+1);
     }
 
-    fn index(&self) -> Index
+	fn index(&self) -> Index
 	{
 		self.index
 	}
 
-	fn parent(&self) -> Option<Index>
+	fn parent(self) -> Option<Index>
 	{
 		self.parent
 	}
@@ -187,45 +167,64 @@ impl Tree for TreeNode
 	{
 		self.children.len()
 	}	
+
+	fn data(&self) -> &Box<dyn Any + Send + Sync>
+	{
+		&self.data
+	}
+
+	fn data_mut(&mut self) -> &mut Box<dyn Any + Send + Sync>
+	{
+		&mut self.data
+	}
 }
 
+impl Drop for TreeNode
+{
+	fn drop(&mut self)
+	{
+		println!("Tree node dropped {},{}", self.index.age(), self.index.index());
+	}
+}
+
+/*
 impl Tree for Index
 {	
-    fn remove(&mut self, index : Index) -> Index
+    fn remove(&mut self, index : usize) -> Index
     {
-    	TreeNode::get_arena().lock().unwrap()[*self].remove(index)
+    	TreeNode::arena().lock().unwrap()[*self].remove(index)
     }
 
     fn insert(&mut self,  childindex : usize, child : Index)
     {
-    	TreeNode::get_arena().lock().unwrap()[*self].insert(childindex, child)
+    	TreeNode::arena().lock().unwrap()[*self].insert(childindex, child)
     }
 
     fn index(&self) -> Index
 	{
-		TreeNode::get_arena().lock().unwrap()[*self].index()
+		TreeNode::arena().lock().unwrap()[*self].index()
 	}
 
 	fn parent(&self) -> Option<Index>
 	{
-		TreeNode::get_arena().lock().unwrap()[*self].parent()
+		TreeNode::arena().lock().unwrap()[*self].parent()
 	}
 
 	fn child(&self, index : usize) -> Index
 	{
-		TreeNode::get_arena().lock().unwrap()[*self].child(index)
+		TreeNode::arena().lock().unwrap()[*self].child(index)
 	}
 
 	fn childindex(&self) -> usize
 	{
-    	TreeNode::get_arena().lock().unwrap()[*self].childindex()
+    	TreeNode::arena().lock().unwrap()[*self].childindex()
 	}
 
 	fn children_count(&self) -> usize
 	{
-		TreeNode::get_arena().lock().unwrap()[*self].children_count()
+		TreeNode::arena().lock().unwrap()[*self].children_count()
 	}	
-}
+}*/
 
 #[cfg(test)]
 mod tests 
