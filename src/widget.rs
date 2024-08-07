@@ -15,10 +15,10 @@ pub struct Panel
 }
 
 
-pub trait Widget
+pub trait Widget : Tree
 {	
     fn on_idle(&mut self){}
-    fn paint(&mut self, piet: &mut Piet<'_>, invalid: &Region){}
+    fn paint(&mut self, piet: &mut piet_common::Piet, invalid: &Region){}
     fn size(&mut self, size: Size) {}
     fn key_down(&mut self, event: KeyEvent) -> bool { false }
     fn key_up(&mut self, event: KeyEvent) {}
@@ -33,4 +33,7 @@ pub trait Widget
 }
 
 
-
+impl Widget for Panel
+{
+    
+}

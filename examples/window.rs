@@ -22,8 +22,8 @@ use druid_shell::{
     Menu, MouseEvent, Region, SysMods, TimerToken, WinHandler, WindowBuilder, WindowHandle,
 };
 
-const BG_COLOR: Color = Color::rgb8(0x27, 0x28, 0x22);
-const FG_COLOR: Color = Color::rgb8(0xf0, 0xf0, 0xea);
+const BG_COLOR: Color = Color::rgb8(0xff, 0xff, 0xff);
+const FG_COLOR: Color = Color::rgb8(0x00, 0xff, 0x00);
 
 #[derive(Default)]
 struct HelloState {
