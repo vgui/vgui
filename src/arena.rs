@@ -6,13 +6,19 @@ use std::vec::Vec;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 
+//Arena identifier, increments with Arena::new
 static ARENA_ID : AtomicUsize = AtomicUsize::new(0);
 
 
+// Arena is array of arrayes of objects and array of indexes of freed objects. 
+// Index of Arena is an intermediate entity, to present real object.
+// Chunk size is a size of array in array. Index of this chunk is age. And index of index is real object.
+// Somthing like Arena[age][index] -> accsess to object.
+// And Arena.freed[] - freed objects.
 #[derive(Copy, Clone, Debug)]
 pub struct Index 
 {
-	arena : usize,//Arena identifier from ARENA_ID
+	arena : usize,//Arena identifier, ARENA_ID increments with Arena::new
 	age : usize,
 	index : usize,
 }
@@ -45,21 +51,21 @@ impl Index
 		self.index
 	}
 
-	pub fn set_age(&mut self, age : usize)
-	{
-		self.age = age
-	}
+	// pub fn set_age(&mut self, age : usize)
+	// {
+	// 	self.age = age
+	// }
 
-	pub fn set_index(&mut self, index : usize)
-	{
-		self.index = index
-	}
+	// pub fn set_index(&mut self, index : usize)
+	// {
+	// 	self.index = index
+	// }
 
-	pub fn set(&mut self, age : usize, index : usize)
-	{
-		self.age = age;
-		self.index = index
-	}	
+	// pub fn set(&mut self, age : usize, index : usize)
+	// {
+	// 	self.age = age;
+	// 	self.index = index
+	// }	
 }
 
 impl PartialEq for Index 

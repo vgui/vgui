@@ -6,7 +6,7 @@
 use druid_shell::{ Region, KeyEvent, MouseEvent };
 use piet_common::Piet;
 use kurbo::Size;
-use crate::tree2::{ TreeNode, Tree };
+use crate::tree::{ TreeNode, Tree };
 
 
 pub struct Panel
