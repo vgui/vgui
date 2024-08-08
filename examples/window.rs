@@ -14,7 +14,7 @@
 
 use std::any::Any;
 
-use druid_shell::kurbo::{Line, Size};
+use druid_shell::kurbo::{Line, Size, Point, Shape, Circle, BezPath, PathEl};
 use druid_shell::piet::{Color, RenderContext};
 
 use druid_shell::{
@@ -39,9 +39,17 @@ impl WinHandler for HelloState {
     fn prepare_paint(&mut self) {}
 
     fn paint(&mut self, piet: &mut piet_common::Piet, _: &Region) {
+        let circle1 = Circle::new(Point::new(50.0,50.0), 30.0);
+        let circle2 = Circle::new(Point::new(100.0,100.0), 30.0);
+        let mut path1 : Vec<PathEl> = circle1.into_path(0.1).into_iter().collect();
+        let mut path2 : Vec<PathEl> = circle2.into_path(0.1).into_iter().collect();
+        path1.append(&mut path2);
+        let clip_path : BezPath = path1.into_iter().collect();
+
+        piet.clip(clip_path);
         let rect = self.size.to_rect();
         piet.fill(rect, &BG_COLOR);
-        piet.stroke(Line::new((10.0, 50.0), (90.0, 90.0)), &FG_COLOR, 1.0);
+        piet.stroke(Line::new((0.0, 0.0), (300.0, 300.0)), &FG_COLOR, 1.0);
     }
 
     fn command(&mut self, id: u32) {
