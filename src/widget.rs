@@ -7,7 +7,7 @@
 use std::any::Any;
 use std::slice::{Iter, IterMut};
 use druid_shell::{ Region, KeyEvent, MouseEvent };
-use ::kurbo::{Size, Shape};
+use kurbo::{Line, Size, Point, Shape, Circle, BezPath, PathEl};
 use piet_common::{RenderContext};
 use crate::tree::{ RcRefCell, TreeNode, Tree };
 
@@ -15,13 +15,21 @@ use crate::tree::{ RcRefCell, TreeNode, Tree };
 
 pub struct WidgetBase
 {
-	tree : TreeNode,
-    //shape : Box<dyn Shape>,
+	tree : RcRefCell<TreeNode>,
+    shape : BezPath,
 }
 
 pub struct Panel
 {
-    tree : TreeNode,
+    base : WidgetBase,
+}
+
+impl Panel
+{
+    pub fn new()
+    {
+        
+    }
 }
 
 pub trait Widget : Tree
@@ -52,57 +60,59 @@ impl Tree for Panel
 {
     fn remove(&mut self, childindex : usize) -> RcRefCell<TreeNode>
     {
-        self.tree.remove(childindex)
+        self.base.tree.borrow_mut().remove(childindex)
     }
 
     fn insert(&mut self,  childindex : usize, child : &mut TreeNode)
     {
-        self.tree.insert(childindex, child)
+        self.base.tree.borrow_mut().insert(childindex, child)
     }
 
     fn set_parent(&mut self, newparent : &mut TreeNode, childindex : usize)
     {
-        self.tree.set_parent(newparent, childindex)
+        self.base.tree.borrow_mut().set_parent(newparent, childindex)
     }
 
     fn iter(&self) -> Iter<'_, RcRefCell<TreeNode>>
     {
-        self.tree.iter()
+        let i = self.base.tree.borrow();
+        i.iter()
     }
 
     fn iter_mut(&mut self) -> IterMut<'_, RcRefCell<TreeNode>>
     {
-        self.tree.iter_mut()
+        self.base.tree.borrow_mut().iter_mut()
     }
 
     fn parent(&self) -> Option<RcRefCell<TreeNode>>
     {
-        self.tree.parent()
+        self.base.tree.borrow().parent()
     }
 
     fn child(&self, index : usize) -> Option<&RcRefCell<TreeNode>>
     {
-        self.tree.child(index)
+        self.base.tree.borrow().child(index)
     }
 
     fn childindex(&self) -> usize
     {
-        self.tree.childindex()
+        self.base.tree.borrow().childindex()
     }
 
     fn children_count(&self) -> usize
     {
-        self.tree.children_count()
+        self.base.tree.borrow().children_count()
     }
 
     fn data(&self) -> &Box<dyn Any>
     {
-        self.tree.data()
+        self.base.tree.borrow().data()
     }
 
     fn data_mut(&mut self) -> &mut Box<dyn Any>
     {
-        self.tree.data_mut()
+        let mut r = self.base.tree.borrow_mut();
+        r.data_mut()
     }
     
 }

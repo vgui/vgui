@@ -133,8 +133,13 @@ impl TreeNode
 		newparent.insert(childindex, self);		
 	}
 
-	pub fn iter(&self) -> Iter<'_, RcRefCell<Self>>
+	pub fn iter(&self) -> Iter<RcRefCell<Self>>//TreeNodeIter
 	{
+		// TreeNodeIter
+		// {
+		// 	nodes : &self.children,
+		// 	index : 0,
+		// }
 		self.children.iter()
 	}
 
@@ -148,7 +153,7 @@ impl TreeNode
 		self.parent.upgrade()
 	}
 
-	pub fn child(&self, index : usize) -> Option<&RcRefCell<Self>>
+	pub fn child(&self, index : usize) -> Option<RcRefCell<Self>>
 	{
 		self.children.get(index)
 	}
@@ -174,13 +179,35 @@ impl TreeNode
 	}		
 }
 
+/*
+pub struct TreeNodeIter<'a> 
+{
+    nodes: &'a Vec<RcRefCell<TreeNode>>,
+    index: usize,
+}
+
+impl<'a> Iterator for TreeNodeIter<'a> 
+{
+    type Item = &'a RcRefCell<TreeNode>;
+    
+    fn next(&mut self) -> Option<Self::Item> 
+    {
+        if self.index >= self.nodes.len() 
+        {
+            return None
+        }
+        
+        self.index += 1;
+        Some(&self.nodes[self.index - 1])    }
+}*/
+
 
 pub trait Tree
 {	
     fn remove(&mut self, childindex : usize) -> RcRefCell<TreeNode>;
     fn insert(&mut self,  childindex : usize, child : &mut TreeNode);
  	fn set_parent(&mut self, newparent : &mut TreeNode, childindex : usize);
-	fn iter(&self) -> Iter<'_, RcRefCell<TreeNode>>;
+	fn iter(&self) -> Iter<RcRefCell<TreeNode>>;
 	fn iter_mut(&mut self) -> IterMut<'_, RcRefCell<TreeNode>>; 	
 	fn parent(&self) -> Option<RcRefCell<TreeNode>>;
 	fn child(&self, index : usize) -> Option<&RcRefCell<TreeNode>>;
