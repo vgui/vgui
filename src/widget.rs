@@ -89,7 +89,7 @@ impl Tree for Panel
         self.base.tree.borrow().parent()
     }
 
-    fn child(&self, index : usize) -> Option<&RcRefCell<TreeNode>>
+    fn child(&self, index : usize) -> Option<RcRefCell<TreeNode>>
     {
         self.base.tree.borrow().child(index)
     }

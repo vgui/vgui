@@ -6,7 +6,7 @@ use std::vec::Vec;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 
-//Arena identifier, increments with Arena::new
+// Arena identifier counter, increments in Arena::new .
 static ARENA_ID : AtomicUsize = AtomicUsize::new(0);
 
 
@@ -15,21 +15,22 @@ static ARENA_ID : AtomicUsize = AtomicUsize::new(0);
 // Chunk size is a size of array in array. Index of this chunk is age. And index of index is real object.
 // Somthing like Arena[age][index] -> accsess to object.
 // And Arena.freed[] - freed objects.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Index 
 {
-	arena : usize,//Arena identifier, ARENA_ID increments with Arena::new
+	arena_id : usize,// Arena identifier. Is being created in Arena::new by incrementing ARENA_ID.
 	age : usize,
 	index : usize,
 }
 
+// Index is persistent object, it cannot be changed after creation.
 impl Index
 {
-	pub fn new(arena : usize, age : usize, index : usize) -> Self
+	pub fn new(arena_id : usize, age : usize, index : usize) -> Self
 	{
 		Index
 		{
-			arena,
+			arena_id,
 			age,
 			index,
 		}
@@ -38,7 +39,7 @@ impl Index
 	//Arena ID must be unchangable.
 	pub fn arena_id(&self) -> usize
 	{
-		self.arena
+		self.arena_id
 	}
 
 	pub fn age(&self) -> usize
@@ -50,57 +51,39 @@ impl Index
 	{
 		self.index
 	}
-
-	// pub fn set_age(&mut self, age : usize)
-	// {
-	// 	self.age = age
-	// }
-
-	// pub fn set_index(&mut self, index : usize)
-	// {
-	// 	self.index = index
-	// }
-
-	// pub fn set(&mut self, age : usize, index : usize)
-	// {
-	// 	self.age = age;
-	// 	self.index = index
-	// }	
 }
 
-impl PartialEq for Index 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ObjectStatus
 {
-    fn eq(&self, other: &Self) -> bool 
-    {
-        self.arena == other.arena && self.age == other.age && self.index == other.index
-    }
+	Freed,
+	Allocated,
+	NonUsed,
 }
 
-pub struct Arena<T>
+pub struct Arena<T, const CHUNK_SIZE : usize>
 {
-	id : usize,//Arena identifier from ARENA_ID
-	chunk_size : usize,
-	heap : Vec<Vec<Option<T>>>,
-	freed : Vec<Index>,
-	current_age : usize,
-	next_index : usize,
+	id : usize,// Arena identifier. Is being created in Arena::new by incrementing ARENA_ID.
+	heap : Vec<[Option<T>; CHUNK_SIZE]>,
+	status : Vec<[ObjectStatus; CHUNK_SIZE]>,
+	current_index : usize,
 }
 
-impl<T> Arena<T> 
+impl<T : Copy, const CHUNK_SIZE : usize> Arena<T, CHUNK_SIZE> 
 {	
 	pub fn new(chunk_size : usize) -> Self 
 	{			
     	let mut arena = Self 
 		{
 			id : ARENA_ID.load(Ordering::SeqCst),
-			chunk_size,
 			heap : Vec::new(),
-			freed : Vec::new(),
-			current_age : 0,
-			next_index : 0,			
+			status : Vec::new(),
+			current_index : 0,			
 		};
 
-		arena.heap.push(Vec::new());
+		arena.heap.push([None; CHUNK_SIZE]);
+		arena.status.push([ObjectStatus::NonUsed; CHUNK_SIZE]);
+
 		ARENA_ID.fetch_add(1, Ordering::SeqCst);	
 
 		arena		
@@ -111,73 +94,66 @@ impl<T> Arena<T>
 		self.id
 	}
 
-	pub fn chunk_size(&self) -> usize
+	fn find_freed(&self) -> Option<Index>
 	{
-		self.chunk_size
-	}
+		let mut age = self.status.len();
+		let mut index = self.current_index;
 
-	pub fn ages(&self) -> usize
-	{
-		self.heap.len()
-	}
-
-	pub fn used(&self) -> usize
-	{
-		let mut used : usize = 0;
-		
-		for chunk in &self.heap
+		for array in self.status.iter().rev()
 		{
-			for i in chunk
-			{
-				if i.is_some()
-				{
-					used +=1;
-				}
-			}
-		}
-		
-		used
-	}
+			let (left, _) = array.split_at(index);
 
-	pub fn freed(&self) -> usize
-	{
-		self.freed.len()
+			for obj in left.iter().rev()
+			{
+				if *obj == ObjectStatus::Freed
+				{
+					return Some(Index::new(self.id, age, index));
+				}
+
+				index -= 1;
+			}
+
+			age -= 1;
+		}
+
+		None
 	}
 
 	pub fn alloc(&mut self, obj : T) -> Index
 	{
 		//Chunk is full, need to alloc new chunk.
-		if self.next_index == self.chunk_size 
+		if self.current_index == CHUNK_SIZE 
 		{
-			self.heap.push(Vec::new());		
-			self.next_index = 0;
-			self.current_age += 1;						
-			self.heap[self.current_age].reserve(self.chunk_size);
-		}		
+			self.heap.push([None; CHUNK_SIZE]);
+			self.status.push([ObjectStatus::NonUsed; CHUNK_SIZE]);
+			self.current_index = 0;
+		}				
 
-		if self.freed.len() == 0  
+		if let Some(freed) = self.find_freed()
 		{
-			self.heap[self.current_age].push(Some(obj));
-			assert_eq!(self.heap[self.current_age].len()-1, self.next_index);
-			
-			let index = Index::new(self.id, self.current_age, self.next_index);
-			self.next_index += 1;					
-			
+			self.heap[freed.age][freed.index] = Some(obj);
+			self.status[freed.age][freed.index] = ObjectStatus::Allocated;
+			freed
+		}
+		else
+		{
+			let index = Index::new(self.id, self.heap.len() - 1, self.current_index);
+			self.heap[index.age][index.index] = Some(obj);
+			self.status[index.age][index.index] = ObjectStatus::Allocated;
+			self.current_index += 1;
 			index
 		}
-		else 
-		{
-			let index = self.freed.pop().unwrap();
-			self.heap[index.age][index.index] = Some(obj);
-			index
-		}		
 	}
 
-	fn check_index(&self, index : Index) -> bool
+	// Is index have valid 'id', 'age' and 'index' for current arena ?
+	// To test real object use 'Arena::get' method, if it return None,
+	// than invalid index used or obect is freed. 
+	// Test it with 'Arena::is_freed' method.
+	fn is_valid_index(&self, index : Index) -> bool
 	{		
-		if self.id == index.arena
+		if self.id == index.arena_id
 			&& index.age < self.heap.len()
-				&& index.index < self.heap[index.age].len()					
+				&& index.index < CHUNK_SIZE				
 		{
 			true
 		}
@@ -185,11 +161,16 @@ impl<T> Arena<T>
 		{
 			false
 		}
-	}	
+	}
+
+	fn is_freed(&self, index : Index) -> bool
+	{
+		self
+	}
 
 	pub fn free(&mut self, index : Index) 
 	{
-		if self.check_index(index) == false && self.get(index).is_some() == true
+		if self.is_valid_index(index) == false && self.get(index).is_some() == true
 		{
 			panic!("Wrong Arena index for freeing !")
 		}
@@ -292,7 +273,7 @@ mod tests
         assert_eq!(arena.heap[0].len(), 0);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 0);
-        assert_eq!(arena.next_index, 0);        
+        assert_eq!(arena.current_index, 0);        
     }
 
    #[test]
@@ -305,7 +286,7 @@ mod tests
         assert_eq!(arena.heap[0].len(), 1);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 0);
-        assert_eq!(arena.next_index, 1);  
+        assert_eq!(arena.current_index, 1);  
         assert_eq!(index.age, 0);
         assert_eq!(index.index, 0);
     }     
@@ -325,7 +306,7 @@ mod tests
         assert_eq!(arena.heap[0].len(), 5);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 0);
-        assert_eq!(arena.next_index, 5);
+        assert_eq!(arena.current_index, 5);
 
         assert_eq!(arena.get(index0) , Some(&MyStruct::new(0, "All is fine 0")));
         assert_eq!(index0.age, 0); assert_eq!(index0.index, 0);
@@ -370,7 +351,7 @@ mod tests
         assert_eq!(arena.heap[1].len(), 1);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 1);
-        assert_eq!(arena.next_index, 1);
+        assert_eq!(arena.current_index, 1);
         assert_eq!(indexs.len(), TEST_ARENA_CHUNK_SIZE + 1);  
         assert_eq!(indexs[TEST_ARENA_CHUNK_SIZE - 1].age , 0);
         assert_eq!(indexs[TEST_ARENA_CHUNK_SIZE - 1].index , TEST_ARENA_CHUNK_SIZE - 1);
@@ -389,7 +370,7 @@ mod tests
         assert_eq!(arena.heap[1].len(), 1);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 1);
-        assert_eq!(arena.next_index, 1);  
+        assert_eq!(arena.current_index, 1);  
 
         let first0 = Index{arena : arena.id(), age : 0, index : 0};
         let last0 = Index{arena : arena.id(), age : 0, index : TEST_ARENA_CHUNK_SIZE - 1};
@@ -436,7 +417,7 @@ mod tests
         assert_eq!(arena.heap[0].len(), TEST_ARENA_CHUNK_SIZE);
         assert_eq!(arena.freed.len(), 0);
         assert_eq!(arena.current_age, 100);
-        assert_eq!(arena.next_index, 1);
+        assert_eq!(arena.current_index, 1);
 
 		let index1 = Index{arena : arena.id(), age : 13, index : 13};
 		arena.free(index1);
